@@ -14,7 +14,6 @@ Images: contains the visualizations for subjects from a particular pilot cohort.
 This data frame (Neuroethics_Judgement) contains the following columns:
 
 -`user_id` --  Unique subject identifier
-
 - `risk` -- the number indicating how much risk is associated with the treatment for that trial
 - `gain` -- the number indicating how likely you are to successfully treat the dysfunction using the treatment with that trial
 - `no effect` -- the number indicating how likely it is that your treatment will cause no effect for treating the dysfunction

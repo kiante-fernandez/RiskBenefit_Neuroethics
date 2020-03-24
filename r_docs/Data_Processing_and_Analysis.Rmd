@@ -8,3 +8,11 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+ Here is some writing to talk about stuff with some code too!! 
+ 
+```{r}
+x = 1:100
+plot(x)
+```
+ 
+ 

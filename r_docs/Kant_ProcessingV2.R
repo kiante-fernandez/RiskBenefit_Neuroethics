@@ -131,12 +131,12 @@ for (i in Cog_Domains)
 
 TEST = select_(Neuroethics_Judgement,"user_id","condition","Risk_Beta","Ratio_Beta" ,"Gain_Beta")
 TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, Ratio_Beta)
-TEST = filter(TEST, condition == i)
+#TEST = filter(TEST, condition == i)
 
 XX = split(TEST, TEST$condition)
 
 #LONG FORMAT OPTION
-library(plyr); library(dplyr)
+#library(plyr); library(dplyr)
 library(reshape)
 data_long = melt(TEST, id.vars=c("user_id", "condition"))
 View(data_long)
@@ -262,7 +262,7 @@ for (i in user_id){
 
 #Trials on some plots
 ggplot(sub,aes(x = risk , y = gain)) + 
-  geom_point(aes(color = experimental_treatment_selected), size = 5, alpha = .7) +
+  geom_point(aes(color = experimental_treatment_selected), size = qsec, alpha = .7) +
   ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
   scale_x_continuous("Risk Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) +
   scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) + 
