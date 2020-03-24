@@ -20,12 +20,13 @@ cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","
 cleanPilot = na.omit(cleanPilot)
 cleanPilot = filter(cleanPilot, total_trials >= N)
 cleanPilot = mutate(cleanPilot, ratio = gain / risk)
-cleanPilot$ratio = round(cleanPilot$ratio,1)
+cleanPilot$ratio = round(cleanPilot$ratio,2)
 cleanPilot$condition = factor(cleanPilot$condition)
 
 
 survey = read.csv("./data/Qualtrics Data/Risk_Data.csv", header=FALSE, comment.char="#", stringsAsFactors=TRUE)
 survey = survey[,-c(1:13)]
+questions_strings = survey[1,] #Question ID's 
 survey = survey[-1,]
 colnames(survey)[1]= 'user_id' 
 colnames(survey)[19]= 'Attention_Check' 
@@ -63,7 +64,7 @@ user_id = names(BaseMod) #creates vector of user_id's
 # display results
 
 
-lapply(BaseMod,confint) # 95% CI for the coefficients
+#lapply(BaseMod,confint) # 95% CI for the coefficients
 # exp(coef(m))exponentiated coefficients # 95% CI for exponentiated coefficients exp(confint(m))
 #lapply(BaseMod, predict(type="response")) # predicted values
 #lapply(BaseMod, residuals( type="deviance")) # residuals
@@ -73,7 +74,7 @@ lapply(BaseMod,confint) # 95% CI for the coefficients
 #Extraction of the Coefficients for risk and gain
 Coefficients = lapply(BaseMod, coef)
 Coefficients = do.call(rbind, Coefficients)
-Coefficients = Coefficients[,-1]
+Coefficients = Coefficients[,-1] #Removes intercept
 Coefficients = data.frame(Coefficients)
 colnames(Coefficients)= c('Risk_Beta', 'Gain_Beta')
 #Rename
@@ -112,30 +113,10 @@ Coefficients= merge(Coefficients, XX, "user_id")
 Neuroethics_Judgement= merge(Neuroethics_Judgement, Coefficients, "user_id")
 rm(Coefficients, XX)
 
-
-
-
-
-Coefficients$OddsRatio = exp(Coefficients)#Odds Ratios
-Coefficients$user_id = names(Ratio_mod)
-Coefficients$OddsRatio[1] = round(Coefficients$OddsRatio[1],3)
-Coefficients[ , 'Ratio_Beta'] = round(Coefficients[ , 'Ratio_Beta'],3)
-
-Neuroethics_Judgement= merge(Neuroethics_Judgement, Coefficients, "user_id")
-rm(Coefficients)
-
-
-rm(Coefficients)
-rm(TEST)
-
 #Coefficients$Odds_RISK = round(exp(Coefficients[,1]),3)
 #Coefficients$Odds_GAIN = round(exp(Coefficients[,2]),3)
-
-X= lapply(BaseMod, confint)
-
 #Coefficients = slice(Coefficients, rep(1:n(), each = 75)) #Method only works if all observations are the same length
 #we need the exp betas to for interptation purposes
-
 
 #Add Coefficients to the main CSV
 #Neuroethics_Judgement = bind_cols(Neuroethics_Judgement, Coefficients)
@@ -145,14 +126,18 @@ rm(TEST)
 #Condition density odd ratio plots
 i= "Attention (Concentration)"
 for (i in Cog_Domains)
-TEST = select_(Neuroethics_Judgement,"user_id","condition","Risk_Beta", "Gain_Beta", "OddR_Risk_Beta", "OddR_Gain_Beta")
-TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, OddR_Risk_Beta, OddR_Gain_Beta)
+#TEST = select_(Neuroethics_Judgement,"user_id","condition","Risk_Beta","Ratio_Beta" ,"Gain_Beta", "OddR_Risk_Beta", "OddR_Gain_Beta")
+#TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, Ratio_Beta, OddR_Risk_Beta, OddR_Gain_Beta)
+
+TEST = select_(Neuroethics_Judgement,"user_id","condition","Risk_Beta","Ratio_Beta" ,"Gain_Beta")
+TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, Ratio_Beta)
 TEST = filter(TEST, condition == i)
 
 XX = split(TEST, TEST$condition)
 
 #LONG FORMAT OPTION
-library(reshape2)
+library(plyr); library(dplyr)
+library(reshape)
 data_long = melt(TEST, id.vars=c("user_id", "condition"))
 View(data_long)
 
@@ -172,7 +157,12 @@ p2 = ggplot(TEST, aes(Gain_Beta)) +
   scale_x_continuous("Beta", breaks=seq(-.5,.2,.05), limits=c(-.5, .2))+
   theme(axis.text.x = element_text(angle=65, vjust=0.6))
 
-multiplot(p1, p2, cols=1)
+p3 = ggplot(TEST, aes(Ratio_Beta)) +
+  geom_density(aes(fill=factor(condition)), alpha=0.8) +
+  scale_x_continuous("Beta", breaks=seq(-.5,.2,.05), limits=c(-.5, .2))+
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+multiplot(p1, p2, p3, cols=1)
 
 
 #Draft of Main Box Plot Across conditions
@@ -191,13 +181,14 @@ ggplot(data_long, aes(condition, y=value, fill=variable)) +
   geom_boxplot()+
   facet_wrap(~condition, scale="free")
 
-#PLOT 1
+
+#ID individual
 user_id = filter(Neuroethics_Judgement, user_id == "zrwNx8or")
 sub= filter(Neuroethics_Judgement, user_id == "zrwNx8or")
 i = "zrwNx8or"
 
 
-
+#PLOT 1
 for (i in user_id){
   sub = filter(Neuroethics_Judgement, user_id == i)
   plot(sub$risk, sub$experimental_treatment_selected, 
