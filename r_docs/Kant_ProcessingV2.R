@@ -20,7 +20,7 @@ cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","
 cleanPilot = na.omit(cleanPilot)
 cleanPilot = filter(cleanPilot, total_trials >= N)
 cleanPilot = mutate(cleanPilot, ratio = gain / risk)
-cleanPilot$ratio = round(cleanPilot$ratio,2)
+cleanPilot$ratio = round(cleanPilot$ratio,4)
 cleanPilot$condition = factor(cleanPilot$condition)
 
 
@@ -43,23 +43,59 @@ rm(Mpilot, pilot, files, cleanPilot) #Clean up the environment
 
 #Neuroethics_Judgement[,7] <- lapply(Neuroethics_Judgement[,7], as.numeric)
 
+#How many observatoins does each subject have in each class (yes and no)?
+datalist = list()
+for (i in Neuroethics_Judgement$user_id){
+  x = filter(Neuroethics_Judgement, user_id == i)
+  dat = table(x$experimental_treatment_selected) #Check Class bias
+  datalist[[i]] = dat # add it to your list
+}
+Observation_Counts = do.call(rbind, datalist)
+colnames(Observation_Counts) = c('No', 'Yes')
+summary(Observation_Counts)
+View(Observation_Counts)
+rm(i, x,datalist, dat)
 
+
+##To test linearity for each of he continuous variables
+#Divide into cats 
+sub= filter(Neuroethics_Judgement, user_id == "nB8WmX4K")
+TEST = mutate(sub, quantile = ntile(risk, 4))
+xx = xtabs(~experimental_treatment_selected + quantile, data = TEST)
+
+iyes = filter(TEST, experimental_treatment_selected==TRUE)
+
+#Caulate portions 
+#Calculate ln (p/1-p) and plot 
+#Plot aganst the median
+
+
+
+
+#Logsistic Reg
 BaseMod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 Ratio_mod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 
 user_id = names(BaseMod) #creates vector of user_id's 
 
 #pchisq(84.895-21.849, 73) #Chi squared to see relative differeneces from the null
-#anova(mod3$FX9Kjnnw, test="Chisq")
+anova(mod3$zrwNx8or, mod4$zrwNx8or, test="Chisq")
 #drop1(BaseMod$FX9Kjnnw, test="Chisq")
 #mod1 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
-#mod2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+#mod2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ no_effect, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 #mod4 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+mod3 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+mod4 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
 
 #predicted = predict(i, type="response")
 #optCutOff = optimalCutoff(ii$experimental_treatment_selected, predicted)[1] 
 #lapply(BaseMod, summary)
-#lapply(mod4, summary)
+lapply(mod4, summary)
+summary(mod3$nB8WmX4K)
+summary(mod4$nB8WmX4K)
+
 #Omnibus =  list(BaseMod, Ratio_mod)
 # display results
 
@@ -117,9 +153,11 @@ rm(Coefficients, XX)
 #Coefficients$Odds_GAIN = round(exp(Coefficients[,2]),3)
 #Coefficients = slice(Coefficients, rep(1:n(), each = 75)) #Method only works if all observations are the same length
 #we need the exp betas to for interptation purposes
-
 #Add Coefficients to the main CSV
 #Neuroethics_Judgement = bind_cols(Neuroethics_Judgement, Coefficients)
+
+P = exp(log-odds) / (1 + exp(log-odds))
+
 
 rm(TEST)
 
@@ -184,7 +222,7 @@ ggplot(data_long, aes(condition, y=value, fill=variable)) +
 
 #ID individual
 user_id = filter(Neuroethics_Judgement, user_id == "zrwNx8or")
-sub= filter(Neuroethics_Judgement, user_id == "zrwNx8or")
+sub= filter(Neuroethics_Judgement, user_id == "nB8WmX4K")
 i = "zrwNx8or"
 
 

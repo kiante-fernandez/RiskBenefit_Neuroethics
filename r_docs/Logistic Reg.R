@@ -1,7 +1,16 @@
+i = 'zrwNx8or'
 
-
-ii = filter(Neuroethics_Judgement, user_id == "zrwNx8or")
-table(ii$experimental_treatment_selected) #Check Class bias
+datalist = list()
+for (i in Neuroethics_Judgement$user_id){
+x = filter(Neuroethics_Judgement, user_id == i)
+dat = table(x$experimental_treatment_selected) #Check Class bias
+datalist[[i]] = dat # add it to your list
+}
+Observation_Counts = do.call(rbind, datalist)
+colnames(Observation_Counts) = c('No', 'Yes')
+summary(Observation_Counts)
+View(Observation_Counts)
+rm(i, x,datalist, dat)
 
 
 iyes = filter(ii, experimental_treatment_selected==TRUE)
