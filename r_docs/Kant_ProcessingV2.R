@@ -79,7 +79,16 @@ Ratio_mod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x)
 user_id = names(BaseMod) #creates vector of user_id's 
 
 #pchisq(84.895-21.849, 73) #Chi squared to see relative differeneces from the null
-anova(mod3$zrwNx8or, mod4$zrwNx8or, test="Chisq")
+anova(mod3$nB8WmX4K, mod4$nB8WmX4K, test="Chisq")
+
+#loop an anove test of the interaction
+datalist = list()
+for (i in 1:54){
+dat = anova(mod3[[i]], mod4[[i]], test="Chisq")
+  datalist[[i]] = dat
+}
+
+
 #drop1(BaseMod$FX9Kjnnw, test="Chisq")
 #mod1 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 #mod2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ no_effect, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
@@ -92,7 +101,7 @@ mod4 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(
 #predicted = predict(i, type="response")
 #optCutOff = optimalCutoff(ii$experimental_treatment_selected, predicted)[1] 
 #lapply(BaseMod, summary)
-lapply(mod4, summary)
+lapply(mod4[1:10], summary)
 summary(mod3$nB8WmX4K)
 summary(mod4$nB8WmX4K)
 
@@ -326,6 +335,7 @@ for (i in user_id){
   p1 = ggdensity(ino$risk, 
             main = paste("No occurances subject: ",toString(i)),
             xlab = "risk")
+  
   p2 = ggdensity(iyes$risk, 
             main = paste("Yes occurances subject: ",toString(i)),
             xlab = "risk")
@@ -349,3 +359,58 @@ for (i in user_id){
   multiplot(p1, p2, p3, p4, p5, p6, cols=3)
   dev.off()
 }
+
+p1 = ggdensity(sub, 
+          main = paste("subject: ",toString(i)),
+          x = "risk",
+          legend.title = "",
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", fill ="experimental_treatment_selected", palette = c("#f8766d", "#00bfc4"))
+p3 = ggdensity(sub, 
+          x = "gain",
+          legend.title = "",
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", fill ="experimental_treatment_selected", palette = c("#f8766d", "#00bfc4"))
+p5 = ggdensity(sub, 
+          x = "no_effect",
+          legend.title = "",
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", fill ="experimental_treatment_selected", palette = c("#f8766d", "#00bfc4"))
+
+p2=gghistogram(sub, 
+            x = "risk",
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 25,
+            legend.title = "")
+p4=gghistogram(sub, 
+            x = "gain",
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 25,
+            legend.title = "")
+p6=gghistogram(sub, 
+            x = "no_effect",
+            alpha = .5,
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 25,
+            legend.title = "")
+
+
+
+png(filename = paste0(i , ".png"),
+    width = 1234, height = 468)
+multiplot(p1, p2, p3, p4, p5, p6, cols=3)
+dev.off()
+
+
+p4 = ggplot(sub,aes(x = risk , y = gain)) + 
+  geom_point(aes(color = experimental_treatment_selected), size = 2.5, alpha = .7) +
+  ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
+  scale_x_continuous("Risk Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) +
+  scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) + 
+  theme(legend.position="none")
