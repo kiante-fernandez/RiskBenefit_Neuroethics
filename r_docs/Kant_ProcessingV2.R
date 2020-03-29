@@ -41,7 +41,6 @@ Neuroethics_Judgement = cleanPilot
 
 rm(Mpilot, pilot, files, cleanPilot) #Clean up the environment
 
-#Neuroethics_Judgement[,7] <- lapply(Neuroethics_Judgement[,7], as.numeric)
 
 #How many observatoins does each subject have in each class (yes and no)?
 datalist = list()
@@ -72,21 +71,21 @@ iyes = filter(TEST, experimental_treatment_selected==TRUE)
 
 
 
-#Logsistic Reg
+####Logsistic Reg
 BaseMod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 Ratio_mod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 
 user_id = names(BaseMod) #creates vector of user_id's 
 
 #pchisq(84.895-21.849, 73) #Chi squared to see relative differeneces from the null
-anova(mod3$nB8WmX4K, mod4$nB8WmX4K, test="Chisq")
+#anova(mod3$nB8WmX4K, mod4$nB8WmX4K, test="Chisq")
 
 #loop an anove test of the interaction
-datalist = list()
-for (i in 1:54){
-dat = anova(mod3[[i]], mod4[[i]], test="Chisq")
-  datalist[[i]] = dat
-}
+#datalist = list()
+#for (i in 1:54){
+#dat = anova(mod3[[i]], mod4[[i]], test="Chisq")
+#  datalist[[i]] = dat
+#}
 
 
 #drop1(BaseMod$FX9Kjnnw, test="Chisq")
@@ -94,16 +93,28 @@ dat = anova(mod3[[i]], mod4[[i]], test="Chisq")
 #mod2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ no_effect, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 #mod4 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 
-mod3 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
-mod4 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+#mod3 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+#mod4 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 
 
+
+#individual curve fitting for a single predictor
+sub = filter(Neuroethics_Judgement, user_id == "nB8WmX4K")
+logr <- glm(experimental_treatment_selected ~ risk, data = sub, family = binomial(link = "logit"),control=glm.control(maxit=50))
+summary(logr)
+ggplot(sub, aes(x=risk, y=experimental_treatment_selected)) + geom_point() + 
+  stat_smooth(method="glm", method.args=list(family="binomial"), se=FALSE)
+  par(mar = c(4, 4, 1, 1)) # Reduce some of the margins so that the plot fits better
+  plot(sub$risk, sub$experimental_treatment_selected)
+  curve(predict(logr, data.frame(risk=x), type="response"), add=TRUE) 
+##########################################
+  
 #predicted = predict(i, type="response")
 #optCutOff = optimalCutoff(ii$experimental_treatment_selected, predicted)[1] 
 #lapply(BaseMod, summary)
-lapply(mod4[1:10], summary)
-summary(mod3$nB8WmX4K)
-summary(mod4$nB8WmX4K)
+#lapply(mod4[1:10], summary)
+#summary(mod3$nB8WmX4K)
+#summary(mod4$nB8WmX4K)
 
 #Omnibus =  list(BaseMod, Ratio_mod)
 # display results
@@ -122,12 +133,21 @@ Coefficients = do.call(rbind, Coefficients)
 Coefficients = Coefficients[,-1] #Removes intercept
 Coefficients = data.frame(Coefficients)
 colnames(Coefficients)= c('Risk_Beta', 'Gain_Beta')
+
+Coefficients$user_id = names(BaseMod)
+
+Neuroethics_Judgement= merge(Neuroethics_Judgement, Coefficients, "user_id")
+rm(Coefficients, XX)
+
+
+
+Coefficients = exp(Coefficients)#exponetiated 
 #Rename
 XX = exp(Coefficients)#Odds Ratios
 colnames(XX) = c('OddR_Risk_Beta', 'OddR_Gain_Beta')
 #Round 
-XX = round(XX,3)
-Coefficients[ , c('Risk_Beta', 'Gain_Beta')] = round(Coefficients[ , c('Risk_Beta', 'Gain_Beta')],3)
+XX = round(XX,4)
+Coefficients[ , c('Risk_Beta', 'Gain_Beta')] = round(Coefficients[ , c('Risk_Beta', 'Gain_Beta')],4)
 #Add Merge parameter
 XX$user_id = names(BaseMod)
 Coefficients$user_id = names(BaseMod)
@@ -144,12 +164,18 @@ Coefficients = Coefficients[,-1]
 Coefficients = data.frame(Coefficients)
 colnames(Coefficients)= c('Ratio_Beta')
 
+Coefficients$user_id = names(Ratio_mod)
+Neuroethics_Judgement= merge(Neuroethics_Judgement, Coefficients, "user_id")
+rm(Coefficients, XX)
+
+
+Coefficients = exp(Coefficients)#exponetiated 
 #Rename
 XX = exp(Coefficients)#Odds Ratios
 colnames(XX) = 'OddR_Ratio_Beta'
 #Round 
 XX$OddR_Ratio_Beta = round(XX$OddR_Ratio_Beta,3)
-Coefficients[ , 'OddR_Ratio_Beta'] = round(Coefficients[ , Coefficients[ , 'OddR_Ratio_Beta']],3)
+Coefficients[ , "Ratio_Beta"] = round(Coefficients[ , "Ratio_Beta"], 4)
 #Add Merge parameter
 XX$user_id = names(Ratio_mod)
 Coefficients$user_id = names(Ratio_mod)
@@ -164,26 +190,21 @@ rm(Coefficients, XX)
 #we need the exp betas to for interptation purposes
 #Add Coefficients to the main CSV
 #Neuroethics_Judgement = bind_cols(Neuroethics_Judgement, Coefficients)
-
 P = exp(log-odds) / (1 + exp(log-odds))
 
 
-rm(TEST)
+#Condition density plots
 
-#Condition density odd ratio plots
-i= "Attention (Concentration)"
-for (i in Cog_Domains)
 #TEST = select_(Neuroethics_Judgement,"user_id","condition","Risk_Beta","Ratio_Beta" ,"Gain_Beta", "OddR_Risk_Beta", "OddR_Gain_Beta")
 #TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, Ratio_Beta, OddR_Risk_Beta, OddR_Gain_Beta)
 
 TEST = select_(Neuroethics_Judgement,"user_id","condition","Risk_Beta","Ratio_Beta" ,"Gain_Beta")
 TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, Ratio_Beta)
-#TEST = filter(TEST, condition == i)
+
 
 XX = split(TEST, TEST$condition)
 
 #LONG FORMAT OPTION
-#library(plyr); library(dplyr)
 library(reshape)
 data_long = melt(TEST, id.vars=c("user_id", "condition"))
 View(data_long)
@@ -192,7 +213,6 @@ View(data_long)
 source("./r_docs/Multiple_plot_function.R")
 
 #Density Plot for Risk, Gain, and Ratio
-
 
 p1 = ggplot(TEST, aes(Risk_Beta)) +
   geom_density(aes(fill=factor(condition)), alpha=0.8) +
@@ -212,12 +232,21 @@ p3 = ggplot(TEST, aes(Ratio_Beta)) +
 multiplot(p1, p2, p3, cols=1)
 
 
+#one way between anova:
+#IV: variable
+#IV: condition
+#DV: value
+aov2 <- aov(value ~ variable*condition, data = data_long)
+summary(aov2)
+model.tables(aov2, "means")
+
+
 #Draft of Main Box Plot Across conditions
 ggplot(data_long, aes(condition, y=value, fill=variable)) +
   geom_boxplot()+
-  scale_y_continuous("Beta", breaks=seq(-.3, 1,.05), limits=c(-.3, 1)) +
+  scale_y_continuous("Beta", breaks=seq(-.3, 2,.05), limits=c(-.3, 2)) +
   theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
-  labs(title="Prediction weights across Cognition", 
+  labs(title="", 
        subtitle="an investigation of domain differences",
        caption="Source: CogNew",
        x="Cognitive Domian",
@@ -230,48 +259,11 @@ ggplot(data_long, aes(condition, y=value, fill=variable)) +
 
 
 #ID individual
-user_id = filter(Neuroethics_Judgement, user_id == "zrwNx8or")
+user_id = filter(Neuroethics_Judgement, user_id == "nB8WmX4K")
 sub= filter(Neuroethics_Judgement, user_id == "nB8WmX4K")
-i = "zrwNx8or"
+i = "nB8WmX4K"
 
-
-#PLOT 1
-for (i in user_id){
-  sub = filter(Neuroethics_Judgement, user_id == i)
-  plot(sub$risk, sub$experimental_treatment_selected, 
-       xaxt="n",
-       yaxt="n",
-       main = paste("75 Trials Pilot Subject: ",toString(i)),
-       xlab = "Harm Probabilities", 
-       ylab = "Choosing an Experimental Treatment", col = "blue")
-       axis(side=1,at=seq(0,100,10),lwd=3)
-       axis(side=2,at=c(0, 1),
-       labels=c("No","Yes"))
-}
-
-    
-#PLOT 2
-library(ggplot2)
-for (i in user_id){
-  sub = filter(Neuroethics_Judgement, user_id == i)
-  final.plot = 
-  ggplot(sub, aes(x = risk, fill = experimental_treatment_selected)) + 
-  geom_histogram(binwidth = 10, position = "stack", bins = 100, color = "black") +
-  ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
-  scale_x_continuous("Harm Probabilities", breaks=seq(0,100,5), limits=c(0, 100))+
-  scale_y_continuous("Frequency", breaks=seq(0,15,1), limits=c(0,15))+
-  theme_linedraw() + 
-  scale_fill_discrete(name = "", labels = c("No to experimental treatment","Yes to experimental treatment"))
- 
-  pdf(paste0(i , ".pdf"))
-  print(final.plot)
-  dev.off()
-}
-
-
-
-
-#THE SUPER PLOT
+#THE SUPER PLOT ######NEED to unstack these
 library(ggplot2)
 for (i in user_id){
   sub = filter(Neuroethics_Judgement, user_id == i)
@@ -287,7 +279,7 @@ for (i in user_id){
   
   p2 = 
     ggplot(sub, aes(x = gain, fill = experimental_treatment_selected)) + 
-    geom_histogram(binwidth = 4, position = "stack", bins = 100, color = "black") +
+    geom_histogram(binwidth = 4, bins = 100, color = "black", alpha=0.5, ) +
     scale_x_continuous("Gain Probabilities", breaks=seq(0,100,5), limits=c(0, 100))+
     scale_y_continuous("Number of Occurrences", breaks=seq(0,15,1), limits=c(0,15))+
     theme_linedraw() +
@@ -295,70 +287,30 @@ for (i in user_id){
   
   p3 =
     ggplot(sub, aes(x = ratio, fill = experimental_treatment_selected)) +
-    geom_histogram(binwidth= .04, position="stack",color="black") +
-    scale_x_continuous("Ratio (Benefit over Harm) Probabilities", breaks=seq(0,20,.2), limits=c(0, 20)) +
+    geom_histogram(
+      binwidth= .05,
+      color="black") +
+    scale_x_continuous("Ratio (Benefit over Harm) Probabilities", breaks=seq(0,5,.2), limits=c(0, 5)) +
     scale_y_continuous("Number of Occurrences", breaks=seq(0,15,1), limits=c(0,15)) +
     theme_linedraw()+
     theme(legend.position="none", axis.text.x  = element_text(angle=50, vjust=0.5, size=6)) 
   
+  gghistogram(sub, 
+              x = "ratio",
+              alpha = .5,
+              ylab = "Number of Occurrences",
+              add = "mean", rug = TRUE,
+              fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"), bins = 100,
+              legend.title = "") 
+              
+              
+          
   png(filename = paste0(i , ".png"),
       width = 1300, height = 575)  
   multiplot(p1, p2, p3, cols=2)
   dev.off()
 }
 
-#Trials on some plots
-ggplot(sub,aes(x = risk , y = gain)) + 
-  geom_point(aes(color = experimental_treatment_selected), size = qsec, alpha = .7) +
-  ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
-  scale_x_continuous("Risk Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) +
-  scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) + 
-  theme(legend.position="none")
-
-
-library(ggExtra)
-g = ggplot(sub, aes(risk, gain)) + 
-  geom_count(aes(color = experimental_treatment_selected), size = 5, alpha = .7) + 
-  geom_smooth(method="lm", se=F)
-
-ggMarginal(g, type = "histogram", fill= "blue")
-
-
-
-#Check the density plots of the resp
-
-for (i in user_id){
-  sub = filter(Neuroethics_Judgement, user_id == i)
-  iyes = filter(sub, experimental_treatment_selected==TRUE)
-  ino = filter(sub, experimental_treatment_selected==FALSE)
-  
-  p1 = ggdensity(ino$risk, 
-            main = paste("No occurances subject: ",toString(i)),
-            xlab = "risk")
-  
-  p2 = ggdensity(iyes$risk, 
-            main = paste("Yes occurances subject: ",toString(i)),
-            xlab = "risk")
-  
-  p3 = ggdensity(ino$gain, 
-            main = paste("No occurances subject: ",toString(i)),
-            xlab = "gain")
-  p4 = ggdensity(iyes$gain, 
-            main = paste("Yes occurances subject: ",toString(i)),
-            xlab = "gain")
-  
-  p5 = ggdensity(ino$no_effect, 
-            main = paste("No occurances subject: ",toString(i)),
-            xlab = "no effect")
-  p6 = ggdensity(iyes$no_effect, 
-            main = paste("Yes occurances subject: ",toString(i)),
-            xlab = "no effect")
-  
-  png(filename = paste0(i , ".png"),
-      width = 1234, height = 468)
-  multiplot(p1, p2, p3, p4, p5, p6, cols=3)
-  dev.off()
-}
 
 p1 = ggdensity(sub, 
           main = paste("subject: ",toString(i)),
@@ -384,6 +336,7 @@ p2=gghistogram(sub,
             fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
             add_density = TRUE, bins = 25,
             legend.title = "")
+
 p4=gghistogram(sub, 
             x = "gain",
             ylab = "Number of Occurrences",
@@ -400,17 +353,106 @@ p6=gghistogram(sub,
             add_density = TRUE, bins = 25,
             legend.title = "")
 
-
-
 png(filename = paste0(i , ".png"),
     width = 1234, height = 468)
 multiplot(p1, p2, p3, p4, p5, p6, cols=3)
 dev.off()
 
-
-p4 = ggplot(sub,aes(x = risk , y = gain)) + 
+#The scatter plot subject graph 
+  ggplot(sub,aes(x = risk , y = gain)) + 
   geom_point(aes(color = experimental_treatment_selected), size = 2.5, alpha = .7) +
   ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
   scale_x_continuous("Risk Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) +
   scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) + 
   theme(legend.position="none")
+
+
+
+###########Old or draft plots
+library(ggExtra)
+#g = ggplot(sub, aes(risk, gain)) + 
+geom_count(aes(color = experimental_treatment_selected), size = 5, alpha = .7) + 
+  geom_smooth(method="lm", se=F)
+ggMarginal(g, type = "histogram", fill= "blue")
+
+
+
+#Check the density plots of the resp
+
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+  iyes = filter(sub, experimental_treatment_selected==TRUE)
+  ino = filter(sub, experimental_treatment_selected==FALSE)
+  
+  p1 = ggdensity(ino$risk, 
+                 main = paste("No occurances subject: ",toString(i)),
+                 xlab = "risk")
+  
+  p2 = ggdensity(iyes$risk, 
+                 main = paste("Yes occurances subject: ",toString(i)),
+                 xlab = "risk")
+  
+  p3 = ggdensity(ino$gain, 
+                 main = paste("No occurances subject: ",toString(i)),
+                 xlab = "gain")
+  p4 = ggdensity(iyes$gain, 
+                 main = paste("Yes occurances subject: ",toString(i)),
+                 xlab = "gain")
+  
+  p5 = ggdensity(ino$no_effect, 
+                 main = paste("No occurances subject: ",toString(i)),
+                 xlab = "no effect")
+  p6 = ggdensity(iyes$no_effect, 
+                 main = paste("Yes occurances subject: ",toString(i)),
+                 xlab = "no effect")
+  
+  png(filename = paste0(i , ".png"),
+      width = 1234, height = 468)
+  multiplot(p1, p2, p3, p4, p5, p6, cols=3)
+  dev.off()
+}
+
+
+#PLOT 1
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+  plot(sub$risk, sub$experimental_treatment_selected, 
+       xaxt="n",
+       yaxt="n",
+       main = paste("75 Trials Pilot Subject: ",toString(i)),
+       xlab = "Harm Probabilities", 
+       ylab = "Choosing an Experimental Treatment", col = "blue")
+  axis(side=1,at=seq(0,100,10),lwd=3)
+  axis(side=2,at=c(0, 1),
+       labels=c("No","Yes"))
+}
+
+
+library(ggplot2)
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+  final.plot = 
+    ggplot(sub, aes(x = risk, fill = experimental_treatment_selected)) + 
+    geom_histogram(binwidth = 10, position = "stack", bins = 100, color = "black") +
+    ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
+    scale_x_continuous("Harm Probabilities", breaks=seq(0,100,5), limits=c(0, 100))+
+    scale_y_continuous("Frequency", breaks=seq(0,15,1), limits=c(0,15))+
+    theme_linedraw() + 
+    scale_fill_discrete(name = "", labels = c("No to experimental treatment","Yes to experimental treatment"))
+  
+  pdf(paste0(i , ".pdf"))
+  print(final.plot)
+  dev.off()
+}
+
+
+ggplot(TEST, aes(Risk_Beta)) +
+  geom_density(aes(fill=factor(condition)), alpha=0.8) +
+  scale_x_continuous("Beta", breaks=seq(-.5,.2,.05), limits=c(-.5, .2))+
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+ggdensity(TEST, 
+          x = "Risk_Beta",
+          legend.title = "",
+          add = "mean", rug = TRUE,
+          color = "condition", fill ="condition")+ scale_x_continuous("Beta", breaks=seq(-.5,.2,.05), limits=c(-.5, .2))
