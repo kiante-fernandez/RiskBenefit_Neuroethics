@@ -11,8 +11,9 @@ files <- list.files(path = "./data/mturk_data_first_50_subjs", pattern = "*.csv"
 pilot <- sapply(files, readr::read_csv, simplify=FALSE) 
 Mpilot = bind_rows(pilot)
 
-N = 75 #Set the min number of trials
-cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","no_effect", "experimental_treatment_selected")
+N = 75#Set the min number of trials
+n = 54#Set the number of subjects 
+cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","no_effect", "experimental_treatment_selected", "key_press", "rt")
 cleanPilot = na.omit(cleanPilot)
 cleanPilot = filter(cleanPilot, total_trials >= N)
 cleanPilot = mutate(cleanPilot, ratio = gain / risk)#Gain over Risk
@@ -20,6 +21,64 @@ cleanPilot$ratio = round(cleanPilot$ratio,4)
 cleanPilot$condition = factor(cleanPilot$condition)
 
 
+#Check the RT data for outliers
+trial_index = data_frame(rep.int(c(1:75), n)) #MAKE SURE THIS IS EQUAL TO THE NUMBER OF SUBJECTS
+colnames(trial_index)= c("trial_index")
+
+cleanPilot = cbind(cleanPilot,trial_index)
+cleanPilot$trial_index = factor(cleanPilot$trial_index)
+
+cleanPilot = filter(cleanPilot, rt <= 60000 & rt >= 250)
+
+cleanPilot =subset(cleanPilot, with(cleanPilot, user_id %in% names(which(table(user_id)>=N)))) #Remove Subjects who do not have 75 trials
+
+#table(cleanPilot$user_id) Sanity Check
+
+cleanPilot$user_id = factor(cleanPilot$user_id)
+
+RT = select_(cleanPilot,"user_id", "rt", "trial_index")
+
+summary(RT)
+
+
+##Plots for RT 
+library(reshape)
+data_long = melt(RT, 
+                 id=c("user_id","trial_index"),
+                 measure=c("rt"))
+
+summary(data_long)
+
+ggplot(data_long, aes(trial_index, value)) +
+  stat_summary(fun = mean, geom = "line") +
+  stat_summary(fun.data=mean_se, geom = "pointrange") +
+  scale_y_continuous("RT (milliseconds)") +
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+  labs(title="", 
+       subtitle="",
+       caption="",
+       x="Trial Number",
+       y="RT (milliseconds)")
+
+datalist = list()
+for (i in RT$user_id){
+  x = filter(RT, user_id == i)
+  dat = summary(x$rt) 
+  datalist[[i]] = dat # add it to your list
+}
+
+user_id = factor(names(datalist)) #creates vector of user_id's 
+
+for (i in user_id){
+  x = filter(RT, user_id == i)
+  sum = summary(x)
+  print(sum)
+  }
+
+rm(data_long)
+
+
+###Add Survey Data 
 survey = read.csv("./data/Qualtrics Data/Risk_Data.csv", header=FALSE, comment.char="#", stringsAsFactors=TRUE)
 survey = survey[,-c(1:13)]
 questions_strings = survey[1,] #Question ID's 
@@ -39,6 +98,7 @@ cleanPilot = merge(cleanPilot, survey, "user_id")
 Neuroethics_Judgement = cleanPilot
 Neuroethics_Judgement$experimental_treatment_selected = factor(Neuroethics_Judgement$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))
 
+write.csv(Neuroethics_Judgement,'Cleaned_Pilot.csv')
 
 rm(Mpilot, pilot, files, cleanPilot) #Clean up the environment
 
@@ -72,6 +132,7 @@ iyes = filter(TEST, experimental_treatment_selected==TRUE)
 
 
 ####Logsistic Reg
+
 BaseMod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 Ratio_mod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 InteractionMod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
@@ -84,13 +145,13 @@ user_id = names(BaseMod) #creates vector of user_id's
 
 #loop an anove test of the interaction on base and ratio model
 datalist = list()
-for (i in 1:46){
+for (i in 1:39){
 dat = anova(Ratio_mod[[i]], InteractionMod[[i]], test="Chisq")
   datalist[[i]] = dat
 }
 lapply(datalist, print) 
 
-drop1(InteractionMod$nB8WmX4K, test="Chisq")
+#drop1(InteractionMod$nB8WmX4K, test="Chisq")
 #mod1 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 #mod2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ no_effect, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 #mod4 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
