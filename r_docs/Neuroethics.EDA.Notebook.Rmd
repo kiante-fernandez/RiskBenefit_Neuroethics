@@ -1,0 +1,537 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Kiante Fernandez
+
+#Main Hypotheses
+
+1) Consistent with previous research on behavioral economics and moral decision making, we hypothesize that participants will be more psychologically risk averse to harm than gain motivated.
+
+2) Participants risk aversion to harm will change as the cognitive domain being treated changes. Specifically, participants will be more risk averse to mood, and self-control because these are more central to self-identity.
+
+3) Participants who are more affluent, educated, liberal, and younger will be risk seeking relative to the average risky decision making behavior observed when judging treatments for others.
+
+- note: we need income, age, education, and political affli here. 
+
+4) In a classification model, the proportion of benefit to harm ratio will be more predictive of whether someone chooses an experimental treatment than the benefits or risks alone. 
+
+##Set the stage
+```{r load libraries }
+source("../r_docs/LoadLibraries.R")
+LoadLibraries()
+```
+
+```{r Import and Transform, warning = FALSE, include=FALSE}
+files <- list.files(path = "../data/mturk_data_first_50_subjs", pattern = "*.csv", full.names = T)
+pilot <- sapply(files, readr::read_csv, simplify=FALSE) 
+Mpilot = bind_rows(pilot)
+
+N = 75#Set the min number of trials
+n = 54#Set the number of subjects 
+cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","no_effect", "experimental_treatment_selected", "key_press", "rt")
+cleanPilot = na.omit(cleanPilot)
+cleanPilot = filter(cleanPilot, total_trials >= N)
+cleanPilot = mutate(cleanPilot, ratio = gain / risk)#Gain over Risk
+#cleanPilot$ratio = round(cleanPilot$ratio,4)
+cleanPilot$condition = factor(cleanPilot$condition)
+
+Neuroethics_Judgement = cleanPilot
+Neuroethics_Judgement$experimental_treatment_selected = factor(Neuroethics_Judgement$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))
+
+#write.csv(Neuroethics_Judgement,'Cleaned_Pilot.csv')
+```
+
+
+```{r survey data}
+###Add Survey Data 
+survey = read.csv("../data/Qualtrics Data/Risk_Data.csv", header=FALSE, comment.char="#", stringsAsFactors=TRUE)
+survey = survey[,-c(1:13)]
+questions_strings = survey[1,] #Question ID's 
+survey = survey[-1,]
+colnames(survey)[1]= 'user_id' 
+colnames(survey)[19]= 'Attention_Check' 
+survey = filter(survey, Attention_Check == 0)
+
+Demographics = survey[, 97:101]
+colnames(Demographics) = c('Sex','Age', 'Race/Ethnicity', 'Education', 'Religion')
+Demographics$Age <- varhandle::unfactor(Demographics$Age)
+Demographics = cbind(Demographics, survey[1])
+cleanPilot = merge(cleanPilot, Demographics, "user_id")
+
+```
+
+We can first check the RT data to see if we can ID any cases that are out of what we would expect. 
+We expect people to respond no faster than 200ms
+
+```{r RT data,}
+#Check the RT data for outliers
+n= 46
+trial_index = data_frame(rep.int(c(1:75), n)) #MAKE SURE THIS IS EQUAL TO THE NUMBER OF SUBJECTS after attention check
+colnames(trial_index)= c("trial_index")
+
+cleanPilot = cbind(cleanPilot,trial_index)
+cleanPilot$trial_index = factor(cleanPilot$trial_index)
+
+cleanPilot = filter(cleanPilot, rt <= 60000 & rt >= 250)
+
+cleanPilot =subset(cleanPilot, with(cleanPilot, user_id %in% names(which(table(user_id)>=N)))) #Remove Subjects who do not have 75 trials
+
+#table(cleanPilot$user_id) Sanity Check
+cleanPilot$user_id = factor(cleanPilot$user_id)
+RT = select_(cleanPilot,"user_id", "rt", "trial_index")
+summary(RT)
+##Plots for RT 
+data_long = melt(RT, 
+                 id=c("user_id","trial_index"),
+                 measure=c("rt"))
+
+summary(data_long)
+
+ggplot(data_long, aes(trial_index, value)) +
+  stat_summary(fun = mean, geom = "line") +
+  stat_summary(fun.data=mean_se, geom = "pointrange") +
+  scale_y_continuous("RT (milliseconds)") +
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+  labs(title="", 
+       subtitle="",
+       caption="",
+       x="Trial Number",
+       y="RT (milliseconds)")
+
+datalist = list()
+for (i in RT$user_id){
+  x = filter(RT, user_id == i)
+  dat = summary(x$rt) 
+  datalist[[i]] = dat # add it to your list
+}
+
+user_id = factor(names(datalist)) #creates vector of user_id's 
+
+for (i in user_id){
+  x = filter(RT, user_id == i)
+  sum = summary(x)
+  print(sum)
+  }
+
+rm(data_long, x, datalist, trial_index)
+
+```
+
+
+
+```{r merging cleaned survey and task data}
+#cleanPilot = merge(cleanPilot, survey, "user_id")
+#cleanPilot = merge(cleanPilot, Demographics, "user_id")
+
+Neuroethics_Judgement = cleanPilot
+Neuroethics_Judgement$experimental_treatment_selected = factor(Neuroethics_Judgement$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))
+
+#user_id = as.character(distinct(Neuroethics_Judgement,user_id))
+
+```
+
+
+```{r observation count}
+#How many observatoins does each subject have in each class (yes and no)?
+datalist = list()
+for (i in Neuroethics_Judgement$user_id){
+  x = filter(Neuroethics_Judgement, user_id == i)
+  dat = table(x$experimental_treatment_selected) #Check Class bias
+  datalist[[i]] = dat # add it to your list
+}
+Observation_Counts = do.call(rbind, datalist)
+colnames(Observation_Counts) = c('No', 'Yes')
+summary(Observation_Counts)
+View(Observation_Counts)
+rm(i, x,datalist, dat)
+```
+
+```{r Individual subject visual data check, eval=FALSE, include=FALSE}
+#Mutiple Plots
+source("../r_docs/Multiple_plot_function.R")
+
+#Individual Scatter: subject graph 
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+  
+g = ggplot(sub,aes(x = risk , y = gain)) + 
+  geom_point(aes(color = experimental_treatment_selected), size = 2.5, alpha = .7) +
+  ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
+  scale_x_continuous("Risk Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) +
+  scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) + 
+  theme(legend.position="none")
+  
+  png(filename = paste0(i , ".png"),
+      width = 500, height = 372)
+  print(g)
+  dev.off()
+}
+
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+#Density Plots for risk, gain, and no effect
+  p1 = ggdensity(sub, 
+          main = paste("subject: ",toString(i)),
+          x = "risk",
+          legend.title = "",
+          xticks.by = 10,
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#f8766d", "#00bfc4"))
+  p3 = ggdensity(sub, 
+          x = "gain",
+          legend = "none",
+          xticks.by = 10,
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#f8766d", "#00bfc4"))
+  p5 = ggdensity(sub, 
+          x = "no_effect",
+          legend = "none",
+          xticks.by = 10,
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#f8766d", "#00bfc4"))
+#Histograms for risk, gain, and no effect
+  p2=gghistogram(sub, 
+            x = "risk",
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 30,
+            legend = "none",
+            xticks.by = 10)
+  p4=gghistogram(sub, 
+            x = "gain",
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 30,
+            legend = "none",
+            xticks.by = 10)
+  p6=gghistogram(sub, 
+            x = "no_effect",
+            alpha = .5,
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 30, 
+            legend = "none",
+            xticks.by = 10)
+
+  png(filename = paste0(i , ".png"),
+    width = 1234, height = 468)
+  multiplot(p1, p2, p3, p4, p5, p6, cols=3)
+  dev.off()
+}
+#Ratio plots
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+  
+#Density plot  
+  p1 = ggdensity(sub, 
+               x = "ratio",
+               legend.title = paste("75 Trials Pilot Subject: ",toString(i)),
+               add = "mean", rug = TRUE,
+               color = "experimental_treatment_selected", 
+               fill ="experimental_treatment_selected", 
+               palette = c("#f8766d", "#00bfc4"),
+               xticks.by = 1)
+#Histogram
+  p2 = gghistogram(sub, 
+            x = "ratio",
+            alpha = .5,
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 200,
+            legend = "none", 
+            xticks.by = 1)
+  
+  png(filename = paste0(i , ".png"),
+    width = 1234, height = 468)
+  multiplot(p1, p2, cols=1)
+  dev.off()
+}
+```
+
+##H1
+Consistent with previous research on behavioral economics and moral decision making, we hypothesize that participants will be more psychologically risk averse to harm than gain motivated.
+
+To do so, we will fit a binary logistic regression on the task data to display the subject wise sensitivity to risk of harm above and beyond that gain motivated judgments.  
+
+The outcome (response) variable is binary (0/1); No treatment or Yes to experimental treatment. The predictor variables of interest are the amount of risk, gain, and no_effect within each trial. 
+
+So we are modeling the probablity of the response from know values our prdictors(log-transformed).
+
+```{r logisitic Regression, message=FALSE, warning=FALSE}
+####Logsistic Reg
+
+subjectModel.1 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+subjectModel.2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+subjectModel.3 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+```
+
+```{r Model comparisons}
+
+user_id = names(subjectModel.1) #creates vector of user_id's 
+
+#loop an anove test of the interaction on base and ratio model
+datalist = list()
+for (i in 1:39){
+dat = anova(subjectModel.1[[i]], 
+            subjectModel.2[[i]],
+            subjectModel.3[[i]],
+            test="Chisq")
+  datalist[[i]] = dat
+}
+names(datalist) = user_id
+
+lapply(datalist, print) 
+```
+
+```{r Pseduo R^2s }
+source("../r_docs/logisticPseudoR2s.R")
+
+#loop the r^2 calculator on the fitted final model
+datalist.1 = list()
+for (i in 1:39){
+dat = logisticPseudoR2s(subjectModel.2[[i]])
+  datalist.1[[i]] = dat
+}
+#subjectModel.R2 <-  do.call(rbind, datalist.1)
+```
+
+
+```{r odds ratios}
+user_id = names(subjectModel.2) #creates vector of user_id's 
+
+#Compute odds ratio
+datalist.2 = list()
+for (i in 1:39){
+dat = exp(subjectModel.2[[i]]$coefficients)
+  datalist.2[[i]] = dat
+}
+subjectModel.OddRatios = do.call(rbind, datalist.2)
+
+colnames(subjectModel.OddRatios)= c('Intercept', 'Risk_Beta', 'Gain_Beta')
+
+subjectModel.OddRatios = cbind(subjectModel.OddRatios, user_id)
+
+#Coefficients Extraction
+
+Neuroethics_Judgement= merge(Neuroethics_Judgement, subjectModel.OddRatios, "user_id")
+```
+
+
+```{r odds ratio confidence intervals, eval=FALSE, include=FALSE}
+#Compute odds ratio confidence interval
+#only works if values do not contain infinites...
+datalist.3 = list()
+for (i in 1:39){
+dat = exp(confint(subjectModel.2[[i]]))
+  datalist.3[[i]] = dat
+}
+```
+
+
+
+```{r Model Dignostics for best fitted model}
+#Diagnostics for model 2 (Residuals)
+
+#Interpreting residuaLs
+
+datalist.dignostics = list()
+for (i in user_id){
+subjectDignostics = filter(Neuroethics_Judgement, user_id == i)
+  for (ii in 1:39){
+    subjectDignostics$predicted.probabilities<-fitted(subjectModel.2[[ii]])
+    subjectDignostics$standardized.residuals<-rstandard(subjectModel.2[[ii]])
+    subjectDignostics$studentized.residuals<-rstudent(subjectModel.2[[ii]])
+    subjectDignostics$dfbeta<-dfbeta(subjectModel.2[[ii]])
+    subjectDignostics$dffit<-dffits(subjectModel.2[[ii]])
+    subjectDignostics$leverage<-hatvalues(subjectModel.2[[ii]])
+  }
+    datalist.dignostics[[i]] = subjectDignostics
+}
+
+datalist.dignostics = do.call(rbind, datalist.dignostics)
+
+
+#expected leverage is (k + 1)/N
+ explev = 3/75
+#Neuroethics_Judgement = merge(Neuroethics_Judgement,datalist.dignostics, "user_id")
+summary(datalist.dignostics)
+
+#confusionMatrix(ifelse(fitted(subjectModel.2) > .5, "No", "Yes"), d$type)$table
+
+```
+
+
+```{r plot the fitted models for each subject, eval=FALSE, include=FALSE}
+#Mutiple Plots
+source("../r_docs/Multiple_plot_function.R")
+
+for (i in user_id){
+  subject = filter(datalist.dignostics, user_id == i)
+
+    p1 = ggplot(subject, aes(x=risk, y= predicted.probabilities)) + 
+         geom_point(aes(color = experimental_treatment_selected), 
+                    size = 4, alpha = .5,   position = "jitter") + 
+         stat_smooth(method="glm", se=FALSE, fullrange=TRUE, 
+              method.args = list(family=quasibinomial))+
+         scale_x_continuous(expand = c(0,0))+
+         theme(legend.position="none")
+
+    p2 = ggplot(subject, aes(x=gain, y= predicted.probabilities)) + 
+         geom_point(aes(color = experimental_treatment_selected), 
+                    size = 4, alpha = .5, position = "jitter") +
+         stat_smooth(method="glm", se=FALSE, fullrange=TRUE, 
+              method.args = list(family=quasibinomial))+
+         scale_x_continuous(expand = c(0,0))+
+         theme(legend.position="none")
+
+    p3 = ggplot(subject,aes(x = risk , y = gain)) + 
+         geom_point(aes(color = experimental_treatment_selected), 
+                    size = 2.5, alpha = .7, position = "jitter") +
+         ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
+         scale_x_continuous("Risk Probabilities",
+                            breaks=seq(0,100,5), limits=c(0, 100)) +
+         scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), 
+                            limits=c(0, 100)) + 
+         theme(legend.position="none")
+
+     png(filename = paste0(i , ".png"),
+       width = 1234, height = 468)
+     multiplot(p1, p2, p3, cols=2)
+     dev.off()
+}
+
+```
+
+##H2
+
+Participants risk aversion to harm will change as the cognitive domain being treated changes. Specifically, participants will be more risk averse to mood, and self-control because these are more central to self-identity.
+
+```{r drafts, eval=FALSE, include=FALSE}
+library(reshape2)
+
+TEST = dplyr::select(Neuroethics_Judgement, user_id , condition , Intercept,  Risk_Beta , Gain_Beta ,  Sex ,  Age ,  Education)
+
+TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta)
+TEST[,4] = as.numeric(TEST[,4])
+TEST[,3] = as.numeric(TEST[,3])
+
+data_long = melt(TEST, id.vars=c("user_id", "condition"))
+
+data_long[,4] = as.numeric(data_long[,4])
+
+modTEST <- lmer(value ~ 1 + age + sex  + condition + (1 | condition), data = data_long, REML = FALSE)
+summary(modTEST)
+
+```
+
+
+```{r manuscript plot drafts, eval=FALSE, include=FALSE}
+#Draft of Main Box Plot Across conditions
+ggplot(data_long, aes(condition, y=value, fill=variable)) +
+  geom_boxplot()+
+  scale_y_continuous("Beta", breaks=seq(-.3, 2,.05), limits=c(-.3, 2)) +
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+  labs(title="", 
+       subtitle="an investigation of domain differences",
+       caption="Source: CogNew",
+       x="Cognitive Domian",
+       y="Log Odds")
+
+#Separate Box Plots across conditions
+ggplot(data_long, aes(condition, y=value, fill=variable)) +
+  geom_boxplot()+
+  facet_wrap(~condition, scale="free")
+```
+
+##Testing stuff
+
+```{r by trial model fitting, eval=FALSE, include=FALSE}
+
+TrialMod = by(Neuroethics_Judgement, Neuroethics_Judgement$trial_index, function(x) glm(experimental_treatment_selected ~ risk + gain + ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+```
+
+```{r Density plots of beta per cog domain, eval=FALSE, include=FALSE}
+#Density Plot for Risk, Gain,  Ratio
+p1 = ggplot(TEST, aes(Risk_Beta)) +
+  geom_density(aes(fill=factor(condition)), alpha=0.8) +
+  scale_x_continuous("Beta", breaks=seq(-10,75,5), limits=c(-10, 70))+
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+
+p2 = ggplot(TEST, aes(Gain_Beta)) +
+  geom_density(aes(fill=factor(condition)), alpha=0.8) +
+  scale_x_continuous("Beta", breaks=seq(-10,75,5), limits=c(-10, 70))+
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+```
+
+
+```{r mixed effect models drafts, eval=FALSE, include=FALSE}
+library(reshape2)
+library(lme4)
+library(lmerTest)
+
+TEST = dplyr::select(Neuroethics_Judgement, user_id , condition , Risk_Beta , Ratio_Beta , Gain_Beta ,  Sex ,  Age ,  Education)
+
+TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, Ratio_Beta)
+
+data_long = melt(TEST, id.vars=c("user_id", "condition", "age", "sex" ))
+
+
+modTEST <- lmer(value ~ 1 + age + sex  + condition + (1 | condition), data = data_long, REML = FALSE)
+summary(modTEST)
+```
+
+```{r Testing multicollinearity, eval=FALSE, include=FALSE}
+library(car)
+
+vif(subjectModel.2)
+1/vif(subjectModel.2)
+
+cor(subject[, c("risk", "gain", "no_effect")])
+
+cor.test(subject$risk, subject$gain)  
+cor.test(subject$risk, subject$no_effect)  
+cor.test(subject$gain, subject$no_effect)
+```
+
+```{r Testing the linearity of the logit, eval=FALSE, include=FALSE}
+
+#Create the interaction of Risk with log(risk)
+subject$logRisk<-log(subject$risk)*subject$risk
+
+#Create the interaction of Gain and No Effect with their logs
+
+subject$logGain<-log(subject$gain)*subject$gain
+subject$logNo_effect<-log(subject$no_effect)*subject$no_effect
+
+head(subject)
+
+
+
+subjectTest.1 <- glm(experimental_treatment_selected ~ 
+                       risk +
+                       gain + 
+                       no_effect +
+                       logRisk +
+                       logGain +	
+                       logNo_effect, 
+                     data=subject, family=binomial())
+summary(subjectTest.1)
+# None of the Interaction variables show significance, so linearity test passes
+```

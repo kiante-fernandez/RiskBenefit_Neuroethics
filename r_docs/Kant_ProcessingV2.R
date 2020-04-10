@@ -1,6 +1,5 @@
 #Kant_Processing is a script for preparing data and providing 
 #summary measures and plots for intial analysis
-install.packages(c("dplyr", "tidyselect", "magrittr", "ggplot2", "ggpubr"))
 rm(list=ls())
 
 source("./r_docs/LoadLibraries.R")
@@ -33,14 +32,9 @@ cleanPilot = filter(cleanPilot, rt <= 60000 & rt >= 250)
 cleanPilot =subset(cleanPilot, with(cleanPilot, user_id %in% names(which(table(user_id)>=N)))) #Remove Subjects who do not have 75 trials
 
 #table(cleanPilot$user_id) Sanity Check
-
 cleanPilot$user_id = factor(cleanPilot$user_id)
-
 RT = select_(cleanPilot,"user_id", "rt", "trial_index")
-
 summary(RT)
-
-
 ##Plots for RT 
 library(reshape)
 data_long = melt(RT, 
@@ -87,16 +81,26 @@ colnames(survey)[1]= 'user_id'
 colnames(survey)[19]= 'Attention_Check' 
 survey = filter(survey, Attention_Check == 0)
 
+
 Demographics = survey[, 97:114]
-colnames(Demographics) = c('Sex','Age', 'Race/Ethnicity', 'Education')
+Demographics = survey[, 97:101]
+
+
+colnames(Demographics) = c('Sex','Age', 'Race/Ethnicity', 'Education', 'Religion')
+Demographics = cbind(Demographics, survey[1])
+
 
 Cog_Domains = factor(c("Attention (Concentration)", "Motor Function", "Language (spoken)","Long Term Memory","Mood","Self-control","Short Term (Working) Memory"))
 
 
 cleanPilot = merge(cleanPilot, survey, "user_id")
 
+cleanPilot = merge(cleanPilot, Demographics, "user_id")
+
+
 Neuroethics_Judgement = cleanPilot
-Neuroethics_Judgement$experimental_treatment_selected = factor(Neuroethics_Judgement$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))
+#Check order the levels of the outcome factor to ensure that No to Treatment is  the baseline categorie
+Neuroethics_Judgement$experimental_treatment_selected = factor(Neuroethics_Judgement$experimental_treatment_selected, levels = c(FALSE,TRUE), labels = c("No to treatment","Yes to treatment"))
 
 write.csv(Neuroethics_Judgement,'Cleaned_Pilot.csv')
 
@@ -116,25 +120,17 @@ View(Observation_Counts)
 rm(i, x,datalist, dat)
 
 
-##To test linearity for each of he continuous variables
-#Divide into cats 
-sub= filter(Neuroethics_Judgement, user_id == "nB8WmX4K")
-TEST = mutate(sub, quantile = ntile(risk, 4))
-xx = xtabs(~experimental_treatment_selected + quantile, data = TEST)
-
-iyes = filter(TEST, experimental_treatment_selected==TRUE)
-
-#Caulate portions 
-#Calculate ln (p/1-p) and plot 
-#Plot aganst the median
 
 
+TrialMod = by(Neuroethics_Judgement, Neuroethics_Judgement$trial_index, function(x) glm(experimental_treatment_selected ~ risk + gain + ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+sub = filter(Neuroethics_Judgement, user_id == "01rSsifR")
 
 
 ####Logsistic Reg
 
 BaseMod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
-Ratio_mod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+Ratio_mod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 InteractionMod = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 
 
@@ -146,7 +142,7 @@ user_id = names(BaseMod) #creates vector of user_id's
 #loop an anove test of the interaction on base and ratio model
 datalist = list()
 for (i in 1:39){
-dat = anova(Ratio_mod[[i]], InteractionMod[[i]], test="Chisq")
+dat = anova(BaseMod[[i]], Ratio_mod[[i]], test="Chisq")
   datalist[[i]] = dat
 }
 lapply(datalist, print) 
@@ -166,9 +162,12 @@ logr <- glm(experimental_treatment_selected ~ risk, data = sub, family = binomia
 summary(logr)
 ggplot(sub, aes(x=risk, y=experimental_treatment_selected)) + geom_point() + 
   stat_smooth(method="glm", method.args=list(family="binomial"), se=FALSE)
+
+
   par(mar = c(4, 4, 1, 1)) # Reduce some of the margins so that the plot fits better
   plot(sub$risk, sub$experimental_treatment_selected)
   curve(predict(logr, data.frame(risk=x), type="response"), add=TRUE) 
+  
 ##########################################
   
 #predicted = predict(i, type="response")
@@ -199,7 +198,7 @@ colnames(Coefficients)= c('Risk_Beta', 'Gain_Beta')
 Coefficients$user_id = names(BaseMod)
 
 Neuroethics_Judgement= merge(Neuroethics_Judgement, Coefficients, "user_id")
-rm(Coefficients, XX)
+rm(Coefficients)
 
 
 
@@ -219,32 +218,18 @@ Neuroethics_Judgement= merge(Neuroethics_Judgement, Coefficients, "user_id")
 rm(Coefficients, XX)
 
 
-#Extraction of the Coefficients for Ratio
-Coefficients = lapply(Ratio_mod, coef)
+Coefficients = lapply(TrialMod, coef)
 Coefficients = do.call(rbind, Coefficients)
-Coefficients = Coefficients[,-1]
+Coefficients = Coefficients[,-1] #Removes intercept
 Coefficients = data.frame(Coefficients)
-colnames(Coefficients)= c('Ratio_Beta')
+colnames(Coefficients)= c('Risk_Beta', 'Gain_Beta', 'Ratio_Beta')
 
-Coefficients$user_id = names(Ratio_mod)
+Coefficients$Trial_index = names(TrialMod)
+
 Neuroethics_Judgement= merge(Neuroethics_Judgement, Coefficients, "user_id")
-rm(Coefficients, XX)
+rm(Coefficients)
 
 
-Coefficients = exp(Coefficients)#exponetiated 
-#Rename
-XX = exp(Coefficients)#Odds Ratios
-colnames(XX) = 'OddR_Ratio_Beta'
-#Round 
-XX$OddR_Ratio_Beta = round(XX$OddR_Ratio_Beta,3)
-Coefficients[ , "Ratio_Beta"] = round(Coefficients[ , "Ratio_Beta"], 4)
-#Add Merge parameter
-XX$user_id = names(Ratio_mod)
-Coefficients$user_id = names(Ratio_mod)
-Coefficients= merge(Coefficients, XX, "user_id")
-#Add to main dataset
-Neuroethics_Judgement= merge(Neuroethics_Judgement, Coefficients, "user_id")
-rm(Coefficients, XX)
 
 #Coefficients$Odds_RISK = round(exp(Coefficients[,1]),3)
 #Coefficients$Odds_GAIN = round(exp(Coefficients[,2]),3)
@@ -252,21 +237,37 @@ rm(Coefficients, XX)
 #we need the exp betas to for interptation purposes
 #Add Coefficients to the main CSV
 #Neuroethics_Judgement = bind_cols(Neuroethics_Judgement, Coefficients)
-
-
+names(Neuroethics_Judgement)
 #Condition density plots
+rm(TEST)
+TEST = select_(Neuroethics_Judgement,"user_id","condition","Risk_Beta","Ratio_Beta" ,"Gain_Beta", "Sex", "Age", "Education")
+TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, Ratio_Beta  )
 
-TEST = select_(Neuroethics_Judgement,"user_id","condition","Risk_Beta","Ratio_Beta" ,"Gain_Beta")
-TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Ratio_Beta, Ratio_Beta)
 
+TEST = merge(TEST , Demographics, "user_id")
+
+write.csv(TEST,'39Sub_Betas.csv')
 
 XX = split(TEST, TEST$condition)
 
 #LONG FORMAT OPTION
-library(reshape)
-data_long = melt(TEST, id.vars=c("user_id", "condition"))
+library(reshape2)
+data_long = melt(TEST, id.vars=c("user_id", "condition", "age", "sex" ))
+
+data_long[,"V111"] = as.numeric(data_long[,"V111"])
+
+
+write.csv(Neuroethics_Judgement,'Cleaned_Pilot.csv')
+
+data_long = melt(Coefficients, id.vars=c("Trial_index"))
+
 View(data_long)
 
+library(lme4)
+library(lmerTest)
+
+modTEST <- lmer(value ~ 1 + V110 + V111 + V113  + condition + (1 | condition), data = data_long, REML = FALSE)
+summary(modTEST)
 ##PLOTS##
 source("./r_docs/Multiple_plot_function.R")
 
@@ -282,7 +283,7 @@ model.tables(aov2, "means")
 
 
 #Draft of Main Box Plot Across conditions
-ggplot(data_long, aes(condition, y=value, fill=variable)) +
+ggplot(data_long, aes(variable, y=value, fill=condition)) +
   geom_boxplot()+
   scale_y_continuous("Beta", breaks=seq(-.3, 2,.05), limits=c(-.3, 2)) +
   theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
@@ -391,7 +392,7 @@ for (i in user_id){
 for (i in user_id){
   sub = filter(Neuroethics_Judgement, user_id == i)
   
-g = ggplot(sub,aes(x = risk , y = gain)) + 
+g = ggplot(subject,aes(x = risk , y = gain)) + 
   geom_point(aes(color = experimental_treatment_selected), size = 2.5, alpha = .7) +
   ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
   scale_x_continuous("Risk Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) +

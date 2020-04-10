@@ -85,6 +85,9 @@ anova(ced.logr, test="Chisq")
 predicted = predict(LogModel, testData, type="response")  # predicted scores
 predicted = predict(m, i, type="response")  # predicted scores
 
+
+predicted = predict(subjectModel.2, subject, type="response")  # predicted scores
+
 #just get the r^2 value...
 
       
@@ -93,7 +96,8 @@ library(InformationValue)
 optCutOff = optimalCutoff(testData$experimental_treatment_selected, predicted)[1] 
 optCutOff = optimalCutoff(i$experimental_treatment_selected, predicted)[1] 
       
-      
+optCutOff = optimalCutoff(subject$experimental_treatment_selected, predicted)[1] 
+
 #library(car) #If was checking for multicollinearity
 #vif(m)
       
@@ -120,7 +124,8 @@ confusionMatrix(ii$experimental_treatment_selected, predicted, threshold = optCu
 
 #Classification plot
 names(ii$experimental_treatment_selected) <- c('Treatment','No Treatment')
-ggplot(data = ii,aes(x = ii$risk , y = ii$gain)) + 
+ggplot(subject, aes(x = risk , y = gain)) + 
   geom_point(aes(color = experimental_treatment_selected), size = 6, alpha = .5) +
   scale_x_continuous(expand = c(0,0)) +
-  scale_y_continuous(expand = c(0,0))
+  scale_y_continuous(expand = c(0,0))+
+  theme(legend.position="none")
