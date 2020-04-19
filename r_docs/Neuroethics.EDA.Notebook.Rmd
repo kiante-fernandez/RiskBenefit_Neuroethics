@@ -24,41 +24,109 @@ LoadLibraries()
 ```
 
 ```{r Import and Transform, warning = FALSE, include=FALSE}
-files <- list.files(path = "../data/mturk_data_first_50_subjs", pattern = "*.csv", full.names = T)
+#files <- list.files(path = "../data/mturk_data_first_50_subjs", pattern = "*.csv", full.names = T)
+
+files <- list.files(path = "../data/mturk_data_total_pilot", pattern = "*.csv", full.names = T)
+
 pilot <- sapply(files, readr::read_csv, simplify=FALSE) 
 Mpilot = bind_rows(pilot)
 
 N = 75#Set the min number of trials
-n = 54#Set the number of subjects 
+n = 110#Set the number of subjects 
 cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","no_effect", "experimental_treatment_selected", "key_press", "rt")
 cleanPilot = na.omit(cleanPilot)
 cleanPilot = filter(cleanPilot, total_trials >= N)
 cleanPilot = mutate(cleanPilot, ratio = gain / risk)#Gain over Risk
+
+
 #cleanPilot$ratio = round(cleanPilot$ratio,4)
 cleanPilot$condition = factor(cleanPilot$condition)
 
-Neuroethics_Judgement = cleanPilot
-Neuroethics_Judgement$experimental_treatment_selected = factor(Neuroethics_Judgement$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))
-
-#write.csv(Neuroethics_Judgement,'Cleaned_Pilot.csv')
+#write.csv(Neuroethics_Judgement,'Cleaned_Pilot.01.csv')
 ```
 
 
 ```{r survey data}
 ###Add Survey Data 
-survey = read.csv("../data/Qualtrics Data/Risk_Data.csv", header=FALSE, comment.char="#", stringsAsFactors=TRUE)
-survey = survey[,-c(1:13)]
-questions_strings = survey[1,] #Question ID's 
-survey = survey[-1,]
-colnames(survey)[1]= 'user_id' 
-colnames(survey)[19]= 'Attention_Check' 
-survey = filter(survey, Attention_Check == 0)
+survey = read.csv("../data/Qualtrics Data/Qualtrics_4_13.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE)
+survey = survey[,-c(1:17)]
+#questions_strings = survey[1,] #Question ID's 
 
-Demographics = survey[, 97:101]
-colnames(Demographics) = c('Sex','Age', 'Race/Ethnicity', 'Education', 'Religion')
-Demographics$Age <- varhandle::unfactor(Demographics$Age)
-Demographics = cbind(Demographics, survey[1])
-cleanPilot = merge(cleanPilot, Demographics, "user_id")
+colnames(survey)[1]= 'user_id' 
+#colnames(survey)[20]= 'Attention_Check.1' 
+#colnames(survey)[37]= 'Attention_Check.2' 
+
+survey = filter(survey, attention_check.1 == 1)
+survey = filter(survey, attention_check.2 == 1)
+#survey = filter(survey, attention_check.3 == 1)
+
+#Personlity Big 5
+Big5 <- cbind(survey[,38:97], survey[,"user_id"])
+
+for (i in 1:60) {
+  Big5[[i]] <- as.numeric(Big5[[i]])
+}
+colnames(Big5)[61]= 'user_id' 
+
+Big5List = list(
+  Extraversion <-  
+    Big5[, c(1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56)],
+  Agreeableness <- 
+    Big5[, c(2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57)],
+  Conscientiousness <-  
+    Big5[, c(3, 8, 13, 18, 23, 28, 33, 38, 43, 48, 53, 58)],
+  Negative_Emotionality <- 
+    Big5[, c(4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 59)],
+  Open_Mindedness <- 
+    Big5[, c(5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)])
+
+Results = list()
+for (i in 1:5){
+  totals <- apply(Big5List[[i]], 1, sum)
+  Results[[i]] = totals 
+}
+TEST = do.call(rbind, Results)
+colnames(TEST) = survey[,"user_id"]
+rownames(TEST) <- c('Extraversion','Agreeableness','Conscientiousness','Negative_Emotionality','Open_Mindedness')
+TEST = as.data.frame(t(TEST))
+XX <- cbind(user_id = Big5[,"user_id"], TEST)
+
+cleanPilot = merge(cleanPilot, XX, "user_id")
+rm(XX, TEST, Results,totals)
+
+#Moral Foundations Survey
+MFQ <- cbind(survey[,4:36], survey[,"user_id"])
+MFQ <- MFQ[,-16]#take out attention check
+colnames(MFQ)[33]= 'user_id' 
+
+MFQList <- list(
+  Harm <- MFQ[,c(1,7,12,17,23,28)],
+  Fairness <- MFQ[,c(2,8,13,18,24,29)],
+  Loyalty <- MFQ[,c(3,9,14,19,25,30)],
+  Athority <- MFQ[,c(4,10,15,20,26,31)],
+  Sancticy <- MFQ[,c(5,11,16,21,27,32)])
+
+Results = list()
+for (i in 1:5){
+  totals <- apply(MFQList[[i]], 1, sum)
+  Results[[i]] = totals 
+}
+
+TEST = do.call(rbind, Results)
+colnames(TEST) = survey[,"user_id"]
+rownames(TEST) <- c('Harm','Fairness','Loyalty','Athority','Sancticy')
+TEST <-  as.data.frame(t(TEST))
+XX <- cbind(user_id = MFQ[,"user_id"], TEST)
+
+cleanPilot <-  merge(cleanPilot, XX, "user_id")
+#Next Measure
+Demographics <- survey[, 98:116]
+#colnames(Demographics) = c('Sex','Age', 'Race/Ethnicity', 'Education', 'Religion')
+
+#Demographics$Age <- varhandle::unfactor(Demographics$Age)
+Demographics <-  cbind(Demographics, survey[1])
+Demographics$sex <- as.factor(Demographics$sex) 
+cleanPilot <-  merge(cleanPilot, Demographics, "user_id")
 
 ```
 
@@ -67,7 +135,7 @@ We expect people to respond no faster than 200ms
 
 ```{r RT data,}
 #Check the RT data for outliers
-n= 46
+n= 109
 trial_index = data_frame(rep.int(c(1:75), n)) #MAKE SURE THIS IS EQUAL TO THE NUMBER OF SUBJECTS after attention check
 colnames(trial_index)= c("trial_index")
 
@@ -124,6 +192,9 @@ rm(data_long, x, datalist, trial_index)
 ```{r merging cleaned survey and task data}
 #cleanPilot = merge(cleanPilot, survey, "user_id")
 #cleanPilot = merge(cleanPilot, Demographics, "user_id")
+
+# center predictors
+#we need to get the average for each subject and subtract it from each observation
 
 Neuroethics_Judgement = cleanPilot
 Neuroethics_Judgement$experimental_treatment_selected = factor(Neuroethics_Judgement$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))
@@ -271,12 +342,30 @@ So we are modeling the probablity of the response from know values our prdictors
 
 ```{r logisitic Regression, message=FALSE, warning=FALSE}
 ####Logsistic Reg
+center_scale <- function(x) {
+    scale(x, scale = FALSE)
+}
 
-subjectModel.1 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+grouped_user_id <- group_by(Neuroethics_Judgement, user_id)
+x = mutate(grouped_user_id, risk_c= center_scale(risk))
+y = mutate(grouped_user_id, gain_c= center_scale(gain))
+foo <- dplyr::select(x, risk_c)
+fee <- dplyr::select(y, gain_c)
 
-subjectModel.2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+Neuroethics_Judgement <- cbind.data.frame(Neuroethics_Judgement, foo)
+Neuroethics_Judgement <- cbind.data.frame(Neuroethics_Judgement, fee)
 
-subjectModel.3 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+Neuroethics_Judgement <- Neuroethics_Judgement[,-43]
+Neuroethics_Judgement <- Neuroethics_Judgement[,-41]
+#note the above only works if the data is the correct size
+
+
+subjectModel.1 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk_c + gain_c, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+#risk_c <- risk - mean(risk) # center predictors
+#gain_c <- gain - mean(gain)
+
+subjectModel.2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk_c*gain_c, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 
 ```
 
@@ -286,16 +375,17 @@ user_id = names(subjectModel.1) #creates vector of user_id's
 
 #loop an anove test of the interaction on base and ratio model
 datalist = list()
-for (i in 1:39){
-dat = anova(subjectModel.1[[i]], 
+for (i in 1:88){
+dat = anova(subjectModel.1[[i]],
             subjectModel.2[[i]],
-            subjectModel.3[[i]],
             test="Chisq")
   datalist[[i]] = dat
 }
 names(datalist) = user_id
 
 lapply(datalist, print) 
+lapply(subjectModel.2, summary)
+
 ```
 
 ```{r Pseduo R^2s }
@@ -303,7 +393,7 @@ source("../r_docs/logisticPseudoR2s.R")
 
 #loop the r^2 calculator on the fitted final model
 datalist.1 = list()
-for (i in 1:39){
+for (i in 1:88){
 dat = logisticPseudoR2s(subjectModel.2[[i]])
   datalist.1[[i]] = dat
 }
@@ -312,23 +402,32 @@ dat = logisticPseudoR2s(subjectModel.2[[i]])
 
 
 ```{r odds ratios}
-user_id = names(subjectModel.2) #creates vector of user_id's 
+user_id = as.factor(names(subjectModel.3)) #creates vector of user_id's 
 
 #Compute odds ratio
 datalist.2 = list()
-for (i in 1:39){
+for (i in 1:88){
 dat = exp(subjectModel.2[[i]]$coefficients)
   datalist.2[[i]] = dat
 }
 subjectModel.OddRatios = do.call(rbind, datalist.2)
 
-colnames(subjectModel.OddRatios)= c('Intercept', 'Risk_Beta', 'Gain_Beta')
+colnames(subjectModel.OddRatios)= c('Intercept', 'Risk_Beta', 'Gain_Beta', 'Interaction_Beta')
 
-subjectModel.OddRatios = cbind(subjectModel.OddRatios, user_id)
+subjectModel.OddRatios <- cbind(subjectModel.OddRatios, user_id)
 
+for (i in 1:3) {
+  subjectModel.OddRatios[[i]] <- as.numeric(subjectModel.OddRatios[[i]])
+}
+
+XXXXXX = merge(subjectModel.OddRatios,  "user_id")
+
+
+str(subjectModel.OddRatios)
 #Coefficients Extraction
 
 Neuroethics_Judgement= merge(Neuroethics_Judgement, subjectModel.OddRatios, "user_id")
+##I cannot get my variables back into numeric form. 
 ```
 
 
@@ -352,7 +451,7 @@ dat = exp(confint(subjectModel.2[[i]]))
 datalist.dignostics = list()
 for (i in user_id){
 subjectDignostics = filter(Neuroethics_Judgement, user_id == i)
-  for (ii in 1:39){
+  for (ii in 1:88){
     subjectDignostics$predicted.probabilities<-fitted(subjectModel.2[[ii]])
     subjectDignostics$standardized.residuals<-rstandard(subjectModel.2[[ii]])
     subjectDignostics$studentized.residuals<-rstudent(subjectModel.2[[ii]])
@@ -383,17 +482,23 @@ source("../r_docs/Multiple_plot_function.R")
 for (i in user_id){
   subject = filter(datalist.dignostics, user_id == i)
 
+  ggplot(subject, aes(x=risk, y= predicted.probabilities)) + 
+      stat_summary(fun = mean, geom = "line")+
+         scale_x_continuous(expand = c(0,0))
+  
+  ggplot(subject, aes(x=gain, y= predicted.probabilities)) + 
+      stat_summary(fun = mean, geom = "line")+
+         scale_x_continuous(expand = c(0,0))
+  
     p1 = ggplot(subject, aes(x=risk, y= predicted.probabilities)) + 
-         geom_point(aes(color = experimental_treatment_selected), 
-                    size = 4, alpha = .5,   position = "jitter") + 
+         geom_point(size = 4, alpha = .5,   position = "jitter") + 
          stat_smooth(method="glm", se=FALSE, fullrange=TRUE, 
               method.args = list(family=quasibinomial))+
          scale_x_continuous(expand = c(0,0))+
          theme(legend.position="none")
 
     p2 = ggplot(subject, aes(x=gain, y= predicted.probabilities)) + 
-         geom_point(aes(color = experimental_treatment_selected), 
-                    size = 4, alpha = .5, position = "jitter") +
+         geom_point(size = 4, alpha = .5, position = "jitter") +
          stat_smooth(method="glm", se=FALSE, fullrange=TRUE, 
               method.args = list(family=quasibinomial))+
          scale_x_continuous(expand = c(0,0))+
@@ -417,20 +522,101 @@ for (i in user_id){
 
 ```
 
+```{r}
+
+i = '01rSsifR'
+for (i in user_id){
+  subject = filter(datalist.dignostics, user_id == i)
+
+ p1 <-  ggplot(subject, aes(x=risk, y= standardized.residuals)) + 
+          geom_point(position = 'jitter')+
+          stat_smooth(method="glm", se=FALSE, fullrange=TRUE, 
+              method.args = list(family=quasibinomial))+
+          scale_x_continuous(expand = c(0,0))+
+          scale_y_continuous("Mean Responce (0 = No 1 = Yes)",breaks=seq(0,1,0.25), 
+                            limits=c(0, 1))
+
+  
+  p2 <- ggplot(subject, aes(x=gain, y= predicted.probabilities)) + 
+           stat_summary(fun = mean, geom = "line")+
+          
+           scale_x_continuous(expand = c(0,0))+
+          scale_y_continuous("Mean Responce (0 = No 1 = Yes)",breaks=seq(0,1,0.25), 
+                            limits=c(0, 1))  
+   png(filename = paste0(i , ".png"),
+       width = 1234, height = 468)
+     multiplot(p1, p2, cols=2)
+     dev.off()
+}
+```
+
+
+```{r risk aversion}
+
+coefficients = lapply(subjectModel.2, coef)
+coefficients = do.call(rbind, coefficients)
+coefficients = coefficients[,-1]#Removes intercept
+#coefficients = coefficients[,3]#Removes interaction
+coefficients = data.frame(coefficients)
+colnames(coefficients)= c('Risk_Beta', 'Gain_Beta', 'Interaction')
+coefficients$user_id = names(subjectModel.2)
+
+coefficients = exp(coefficients)#exponetiated 
+
+
+loss_aversion = mutate(coefficients, lambda = -Risk_Beta/Gain_Beta)
+Neuroethics_Judgement= merge(Neuroethics_Judgement, loss_aversion, "user_id")
+
+summary(loss_aversion)
+```
+
+
 ##H2
 
 Participants risk aversion to harm will change as the cognitive domain being treated changes. Specifically, participants will be more risk averse to mood, and self-control because these are more central to self-identity.
 
 ```{r drafts, eval=FALSE, include=FALSE}
+
+ XX =  group_by(datalist.dignostics, condition)
+  
+  p1 = ggplot(XX, aes(x=risk, y= predicted.probabilities, color = condition)) + 
+      stat_summary(fun = mean, geom = "line")+
+         scale_x_continuous(expand = c(0,0))
+  
+  p2 = ggplot(XX, aes(x=gain, y= predicted.probabilities, color = condition)) + 
+      stat_summary(fun = mean, geom = "line")+
+         scale_x_continuous(expand = c(0,0))
+ XX =  group_by(Neuroethics_Judgement, user_id, condition)
+
+  ggdensity(XX,
+          x = "lambda",
+          legend.title = "",
+          xticks.by = 10,
+          add = "mean", rug = TRUE, 
+          palette = c("#f8766d"))
+  
+gghistogram(loss_aversion, 
+            x = "lambda",
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE, bins = 30)
+
 library(reshape2)
 
-TEST = dplyr::select(Neuroethics_Judgement, user_id , condition , Intercept,  Risk_Beta , Gain_Beta ,  Sex ,  Age ,  Education)
+powerpoint <- dplyr::select(Neuroethics_Judgement, user_id , condition ,  risk , gain , no_effect, experimental_treatment_selected, Risk_Beta , Gain_Beta , Interaction, lambda, trial_index)
 
-TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta)
+head(powerpoint)
+     
+TEST = dplyr::select(Neuroethics_Judgement, user_id , condition ,  Risk_Beta , Gain_Beta , Interaction )
+
+TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, Interaction)
 TEST[,4] = as.numeric(TEST[,4])
 TEST[,3] = as.numeric(TEST[,3])
 
-data_long = melt(TEST, id.vars=c("user_id", "condition"))
+TEST[,1] = as.factor(TEST[,1])
+
+
+data_long = melt(TEST, 
+                 id.vars=c("user_id", "condition"))
 
 data_long[,4] = as.numeric(data_long[,4])
 
@@ -470,13 +656,13 @@ TrialMod = by(Neuroethics_Judgement, Neuroethics_Judgement$trial_index, function
 #Density Plot for Risk, Gain,  Ratio
 p1 = ggplot(TEST, aes(Risk_Beta)) +
   geom_density(aes(fill=factor(condition)), alpha=0.8) +
-  scale_x_continuous("Beta", breaks=seq(-10,75,5), limits=c(-10, 70))+
+  scale_x_continuous("Beta", breaks=seq(-5,10,1), limits=c(-5, 10))+
   theme(axis.text.x = element_text(angle=65, vjust=0.6))
 
 
 p2 = ggplot(TEST, aes(Gain_Beta)) +
   geom_density(aes(fill=factor(condition)), alpha=0.8) +
-  scale_x_continuous("Beta", breaks=seq(-10,75,5), limits=c(-10, 70))+
+  scale_x_continuous("Beta", breaks=seq(-5,10,1), limits=c(-5, 10))+
   theme(axis.text.x = element_text(angle=65, vjust=0.6))
 ```
 
@@ -493,7 +679,9 @@ TEST = distinct(Neuroethics_Judgement,user_id, condition, Risk_Beta, Gain_Beta, 
 data_long = melt(TEST, id.vars=c("user_id", "condition", "age", "sex" ))
 
 
-modTEST <- lmer(value ~ 1 + age + sex  + condition + (1 | condition), data = data_long, REML = FALSE)
+modTEST <- glmer(experimental_treatment_selected ~ 1 + risk*condition + gain*condition +
+             (1 + risk*gain | user_id), data = Neuroethics_Judgement, family = binomial)
+
 summary(modTEST)
 ```
 
@@ -534,4 +722,35 @@ subjectTest.1 <- glm(experimental_treatment_selected ~
                      data=subject, family=binomial())
 summary(subjectTest.1)
 # None of the Interaction variables show significance, so linearity test passes
+```
+
+```{r users to remove}
+REMOVE = c(
+  "wpchz8fz",
+  "tdDTyNLl",
+  "CUyB01Th",
+  "d9UbV0sj",
+  "PiGCo5DO",
+  "yCZDIVJF",
+  "WUTFOue2",
+  "Rp8H93tM",
+  "9Z5vJ7oT",
+  "esSkjqdS",
+  "XNHqndg3",
+  "spGR9XvT",
+  "qf27dbHj",
+  "y6m1AOsD",
+  "hgbHHiLn",
+  "Ly8mJkxP"
+)
+
+Neuroethics_Judgement %>%
+      group_by(user_id)  %>%
+      mutate(Neuroethics_Judgement, risk_c= risk-mean(risk)) %>%
+      mutate(Neuroethics_Judgement, gain_c= gain-mean(gain))
+
+Neuroethics_Judgement %>%
+      group_by(user_id)  %>%
+      mutate(risk_c= risk-mean(risk)) %>%
+      mutate(gain_c= gain-mean(gain))
 ```

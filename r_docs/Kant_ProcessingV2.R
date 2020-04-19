@@ -172,7 +172,7 @@ ggplot(sub, aes(x=risk, y=experimental_treatment_selected)) + geom_point() +
   
 #predicted = predict(i, type="response")
 #optCutOff = optimalCutoff(ii$experimental_treatment_selected, predicted)[1] 
-#lapply(BaseMod, summary)
+lapply(BaseMod, summary)
 #lapply(mod4[1:10], summary)
 #summary(mod3$nB8WmX4K)
 #summary(mod4$nB8WmX4K)
@@ -277,7 +277,8 @@ source("./r_docs/Multiple_plot_function.R")
 #IV: variable
 #IV: condition
 #DV: value
-aov2 <- aov(value ~ variable*condition, data = data_long)
+t.test(Neuroethics_Judgement, )
+aov2 <- aov(lambda ~ sex, data = Neuroethics_Judgement)
 summary(aov2)
 model.tables(aov2, "means")
 
@@ -404,3 +405,30 @@ g = ggplot(subject,aes(x = risk , y = gain)) +
   print(g)
   dev.off()
 }
+
+
+
+ggplot(TEST, aes(Risk_Beta)) +
+  geom_density(aes(fill=factor(condition)), alpha=0.8) +
+  scale_x_continuous("Beta", breaks=seq(-5,10,1), limits=c(-5, 10))+
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+
+p2 = ggplot(TEST, aes(Gain_Beta)) +
+  geom_density(aes(fill=factor(condition)), alpha=0.8) +
+  scale_x_continuous("Beta", breaks=seq(-5,10,1), limits=c(-5, 10))+
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+
+library(arm)
+subjectDignostics = dplyr::filter(Neuroethics_Judgement, user_id == '01rSsifR')
+
+binnedplot(fitted(subjectDignostics), 
+           residuals(subjectDignostics, type = "response"), 
+           nclass = NULL, 
+           xlab = "Expected Values", 
+           ylab = "Average residual", 
+           main = "Binned residual plot", 
+           cex.pts = 0.8, 
+           col.pts = 1, 
+           col.int = "gray")
