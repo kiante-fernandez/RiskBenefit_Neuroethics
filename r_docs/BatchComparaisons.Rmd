@@ -1,0 +1,316 @@
+---
+author: "Kianté A. Fernandez"
+date: "5/5/2020"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load library, include=FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(reshape2)
+```
+
+
+```{r yeses, include=FALSE}
+#100% risk of harm 
+batch.1.1 <- read.csv("../data/batch.1.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index, batch, Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig)
+batch.1 <- read.csv("../data/Cleaned_Pilot.05.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index, batch,  Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig) %>%
+    filter(batch == 2)
+batch.1 <- rbind(batch.1.1, batch.1) %>% 
+    filter(experimental_treatment_selected == 'Yes to treatment') 
+rm(batch.1.1)
+
+#first batch with 70%
+batch.2 <- read.csv("../data/Cleaned_Pilot.05.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index, batch,  Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig) %>%
+    filter(batch == 3) %>% 
+    filter(experimental_treatment_selected == 'Yes to treatment')
+
+#Study 1 deployment
+batch.3 <- read.csv("../data/Cleaned_Pilot.05.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index, batch,  Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig) %>%
+    filter(batch == 4) %>%
+    filter(experimental_treatment_selected == 'Yes to treatment')
+
+batch.total <- read.csv("../data/Cleaned_Pilot.05.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect,condition, experimental_treatment_selected, trial_index, batch,  Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig) %>%
+    filter(batch >= 3)
+
+
+```
+
+```{r summary, fig.height=10, fig.width=20, dpi= 300, echo=FALSE}
+
+tt2 <- ttheme_default()
+
+grid.arrange(
+  tableGrob(summary(batch.1), theme=tt2),
+  tableGrob(summary(batch.2), theme=tt2),
+  tableGrob(summary(batch.3), theme=tt2),
+  nrow=3)
+```
+
+Batch 1 is our data prior to the 70 cut off **(67 subjects)**
+
+Batch 2 is our first data set post the 70 cut off **(34 subjects)**
+
+Batch 3 is our data set post deployment **(61 subjects)**
+
+\newpage
+
+Here at side by side comparaisons of the 1st batch 2nd and 3rd batch total trial distributions.
+
+```{r overall trial distribution for risk, fig.height=4, fig.width=12, dpi= 300,  echo=F}
+#Risk
+p1 <- ggplot(batch.1, aes(risk, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#ee7c2e") + 
+    geom_vline(aes(xintercept=mean(risk, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 25), limits=c(0, 500)) + ggtitle("Batch 1")+theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+p2 <- ggplot(batch.2, aes(risk, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#ee7c2e") + 
+    geom_vline(aes(xintercept=mean(risk, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 25), limits=c(0, 500))+ ggtitle("Batch 2") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+p3 <- ggplot(batch.3, aes(risk, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#ee7c2e") + 
+    geom_vline(aes(xintercept=mean(risk, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 25), limits=c(0, 500))+ ggtitle("Batch 3") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+#grid.arrange(p1, p2, p3, ncol = 3)
+```
+
+```{r gain trials, fig.height=4, fig.width=12, dpi= 300, echo=F}
+#Gain
+p4 <- ggplot(batch.1, aes(gain, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#4673c3") + 
+    geom_vline(aes(xintercept=mean(gain, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 25), limits=c(0, 500))
+
+p5 <-ggplot(batch.2, aes(gain, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#4673c3") + 
+    geom_vline(aes(xintercept=mean(gain, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 25), limits=c(0, 500))
+
+p6 <-ggplot(batch.3, aes(gain, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#4673c3") + 
+    geom_vline(aes(xintercept=mean(gain, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 25), limits=c(0, 500))
+#grid.arrange(p3, p4, ncol = 2)
+```
+
+```{r no effect trials, fig.height=4, fig.width=12, dpi= 300, echo=F}
+#No Effect
+p7 <- ggplot(batch.1, aes(no_effect, fill = experimental_treatment_selected)) +   
+    geom_histogram(binwidth=5, colour="black", fill="#747474") + 
+    geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("no effect", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 50), limits=c(0, 500))
+
+p8 <- ggplot(batch.2, aes(no_effect, fill = experimental_treatment_selected)) + 
+    geom_histogram(binwidth=5, colour="black", fill="#747474") + 
+    geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("no effect", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 50), limits=c(0, 500))
+
+p9 <- ggplot(batch.3, aes(no_effect, fill = experimental_treatment_selected)) + 
+    geom_histogram(binwidth=5, colour="black", fill="#747474") + 
+    geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("no effect", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 500, 50), limits=c(0, 500))
+
+#grid.arrange(p5, p6, ncol = 2)
+```
+
+```{r all distributions, fig.height=10, fig.width=12, dpi= 300}
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9, ncol = 3)
+```
+
+The x axis represents the probability that the cognitive deficit either has risk(orange), gain (blue), and no effect (grey) and our Y axis is the total count of observations where an expriemental treatment was chosen. 
+
+
+```{r subject wise odds of Yes, fig.height=10, fig.width=12, dpi=300, echo=F}
+##Risk
+p1<- ggplot(batch.1, aes(x=risk, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(risk, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+  scale_y_continuous("density", breaks=seq(0, .10, .01), limits = c(0, .10))+
+  theme(legend.position="none")+ ggtitle("Batch 1")
+
+p2<- ggplot(batch.2, aes(x=risk, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(risk, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+  scale_y_continuous("density", breaks=seq(0, .10, .01), limits = c(0, .10))+
+  theme(legend.position="none")+ ggtitle("Batch 2")
+
+p3<- ggplot(batch.3, aes(x=risk, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(risk, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+  scale_y_continuous("density", breaks=seq(0, .10, .01), limits = c(0, .10))+
+  theme(legend.position="none")+ ggtitle("Batch 3")
+
+grid.arrange(p1, p2, p3)
+```
+
+```{r gain density, fig.height=10, fig.width=12, dpi=300, echo=F}
+##Gain 
+p1<- ggplot(batch.1, aes(x=gain, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(gain, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+  theme(legend.position="none") + ggtitle("Batch 1")
+
+p2 <- ggplot(batch.2, aes(x=gain, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(gain, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+  theme(legend.position="none") + ggtitle("Batch 2")
+
+p3 <- ggplot(batch.3, aes(x=gain, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(gain, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+  theme(legend.position="none") + ggtitle("Batch 3")
+
+grid.arrange(p1, p2, p3)
+```
+
+```{r no effect density, fig.height=10, fig.width=12, dpi=300, echo=FALSE}
+#No effect
+p1 <- ggplot(batch.1, aes(x=no_effect, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("No Effect", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")+ ggtitle("Batch 1")
+#After filter
+p2 <- ggplot(batch.2, aes(x=no_effect, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("No Effect", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")+ ggtitle("Batch 2")
+
+p3 <- ggplot(batch.3, aes(x=no_effect, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("No Effect", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")+ ggtitle("Batch 3")
+
+grid.arrange(p1, p2, p3)
+```
+
+
+```{r observation count, include= FALSE}
+#How many observatoins does each subject have in each class (yes and no)?
+datalist = list()
+for (i in batch.total$user_id){
+  x = filter(batch.total, user_id == i)
+  dat = table(x$experimental_treatment_selected) #Check Class bias
+  datalist[[i]] = dat # add it to your list
+}
+Observation_Counts = do.call(rbind, datalist)
+colnames(Observation_Counts) = c('No', 'Yes')
+summary(Observation_Counts)
+rm(i, x,datalist, dat)
+```
+```{r observation tables, include=F, eval=FALSE}
+library(knitr)
+kable(Observation_Counts)
+kable(summary(Observation_Counts))
+```
+
+\newpage
+
+
+```{r betas, fig.height=5, fig.width=14, dpi=300, echo=FALSE}
+# A basic box with the conditions colored
+dat.1 = distinct(select(batch.1, user_id ,  Risk_Beta , Gain_Beta , Interaction_Beta))
+dat.2 = distinct(select(batch.2, user_id ,  Risk_Beta , Gain_Beta , Interaction_Beta))
+dat.3 = distinct(select(batch.3, user_id ,  Risk_Beta , Gain_Beta , Interaction_Beta))
+
+dat.1 <- melt(dat.1, 
+                       id = c("user_id"),
+                       variable.name = "cond", 
+                       value.name = "Beta")
+
+dat.2 <- melt(dat.2, 
+                       id = c("user_id"),
+                       variable.name = "cond", 
+                       value.name = "Beta")
+
+dat.3 <- melt(dat.3, 
+                       id = c("user_id"),
+                       variable.name = "cond", 
+                       value.name = "Beta")
+
+p1 <- ggplot(dat.1, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
+      scale_y_continuous(limits=c(-.5, 2))+ggtitle("Batch 1") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+p2 <- ggplot(dat.2, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
+      scale_y_continuous(limits=c(-.5, 2))+ggtitle("Batch 2") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+p3 <- ggplot(dat.3, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
+      scale_y_continuous(limits=c(-.5, 2))+ggtitle("Batch 3") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+grid.arrange(p1, p2, p3, ncol = 3)
+```
+
+\newpage
+
+
+```{r pvalues, fig.height=5, fig.width=13, dpi=300, echo=FALSE}
+dat.1 = distinct(select(batch.1, user_id, Risk_sig, Gain_sig, Interaction_sig))
+dat.2 = distinct(select(batch.2, user_id, Risk_sig, Gain_sig, Interaction_sig))
+dat.3 = distinct(select(batch.3, user_id, Risk_sig, Gain_sig, Interaction_sig))
+
+dat.1 <- melt(dat.1, 
+                       id = c("user_id"),
+                       variable.name = "type", 
+                       value.name = "sig")
+
+dat.2 <- melt(dat.2, 
+                       id = c("user_id"),
+                       variable.name = "type", 
+                       value.name = "sig")
+
+dat.3 <- melt(dat.3, 
+                       id = c("user_id"),
+                       variable.name = "type", 
+                       value.name = "sig")
+
+#Significant plots
+p1 <- ggplot(dat.1, aes(x = type, fill = as.factor(sig))) +
+         geom_bar(color = 'black', stat="count", position = "dodge")+
+         scale_y_continuous(limits=c(0, 110))+ggtitle("Batch 1") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+p2 <- ggplot(dat.2, aes(x = type, fill = as.factor(sig))) +
+         geom_bar(color = 'black', stat="count", position = "dodge")+
+         scale_y_continuous(limits=c(0, 110))+ggtitle("Batch 2") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+p3 <- ggplot(dat.3, aes(x = type, fill = as.factor(sig))) +
+         geom_bar(color = 'black', stat="count", position = "dodge")+
+         scale_y_continuous(limits=c(0, 110))+ggtitle("Batch 3") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+```
+

@@ -57,3 +57,57 @@ careless_eo <- evenodd(careless_dataset, rep(5,10), diag = T)
 even_odd <-  evenodd(survey[,38:97], rep(12,5), diag = T)
 ```
 
+An aggregate score was created by treating a deontological
+response as ‘‘0,’’ a consequentialist response as ‘‘1,’’ a strong consequentialist response as
+‘‘2,’’ and averaging the six responses for each participant. The resulting score, which I will
+refer to as a consequentialism score, reflects the extent to which an individual provides
+consequentialist responses.
+
+```{r, dpi=300}
+
+
+MC <- cbind(survey[,133:138], survey[1])
+
+Results = list()
+for (i in 1:6){
+  totals <- apply(MC[i],1,mean)
+  Results[[i]] = totals 
+}
+
+TEST = do.call(rbind, Results)
+colnames(TEST) = survey[,"user_id"]
+rownames(TEST) <- c('Lying','Assasination','Torture','Murder','Stealing','ForcedSterilization')
+TEST <-  as.data.frame(t(TEST))
+XX <- cbind(user_id = MC[,"user_id"], TEST)
+
+
+moral <-XX
+moral$Lying <- factor(moral$Lying,  labels = c("deontological","consequentialist", "strong consequentialist"), levels = c(0,1,2))
+
+moral$Assasination <- factor(moral$Assasination,  labels = c("deontological","consequentialist", "strong consequentialist"), levels = c(0,1,2))
+
+moral$Torture <- factor(moral$Torture,  labels = c("deontological","consequentialist", "strong consequentialist"), levels = c(0,1,2))
+
+moral$Murder <- factor(moral$Murder,  labels = c("deontological","consequentialist", "strong consequentialist"), levels = c(0,1,2))
+
+moral$Stealing <- factor(moral$Stealing,  labels = c("deontological","consequentialist", "strong consequentialist"), levels = c(0,1,2))
+
+moral$ForcedSterilization <- factor(moral$ForcedSterilization,  labels = c("deontological","consequentialist", "strong consequentialist"), levels = c(0,1,2))
+
+data_long <- melt(moral, 
+                       id = c("user_id"),
+                       variable.name = "scenario", 
+                       value.name = "consequentialism.level")
+
+ggplot(data_long, aes(x = scenario, fill = consequentialism.score)) +
+         geom_bar(color = 'black', stat="count", position = "dodge")+
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))+
+  theme_classic()
+
+
+
+
+```
+
+
+
