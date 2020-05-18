@@ -32,22 +32,21 @@ batch.1 <- rbind(batch.1.1, batch.1) %>%
 rm(batch.1.1)
 
 #first batch with 70%
-batch.2 <- read.csv("../data/Cleaned_Pilot.05.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+batch.2 <- read.csv("../data/Cleaned_Pilot.06.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
     select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index, batch,  Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig) %>%
     filter(batch == 3) %>% 
     filter(experimental_treatment_selected == 'Yes to treatment')
 
 #Study 1 deployment
-batch.3 <- read.csv("../data/Cleaned_Pilot.05.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+batch.3 <- read.csv("../data/Cleaned_Pilot.06.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
     select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index, batch,  Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig) %>%
     filter(batch == 4) %>%
     filter(experimental_treatment_selected == 'Yes to treatment')
 
-batch.total <- read.csv("../data/Cleaned_Pilot.05.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
-    select(user_id, risk, gain, no_effect,condition, experimental_treatment_selected, trial_index, batch,  Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig) %>%
-    filter(batch >= 3)
+batch.total <- read.csv("../data/Cleaned_Pilot.06.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect,condition, experimental_treatment_selected, trial_index, batch,  Risk_Beta , Gain_Beta , Interaction_Beta, Risk_sig, Gain_sig, Interaction_sig) 
 
-
+summary(batch.total)
 ```
 
 ```{r summary, fig.height=10, fig.width=20, dpi= 300, echo=FALSE}
@@ -240,12 +239,15 @@ kable(summary(Observation_Counts))
 \newpage
 
 
-```{r betas, fig.height=5, fig.width=14, dpi=300, echo=FALSE}
+```{r betas, fig.height=5, fig.width=16, dpi=300, echo=FALSE}
 # A basic box with the conditions colored
 dat.1 = distinct(select(batch.1, user_id ,  Risk_Beta , Gain_Beta , Interaction_Beta))
 dat.2 = distinct(select(batch.2, user_id ,  Risk_Beta , Gain_Beta , Interaction_Beta))
 dat.3 = distinct(select(batch.3, user_id ,  Risk_Beta , Gain_Beta , Interaction_Beta))
 
+dat.total = distinct(select(batch.total, user_id ,  Risk_Beta , Gain_Beta , Interaction_Beta))
+
+
 dat.1 <- melt(dat.1, 
                        id = c("user_id"),
                        variable.name = "cond", 
@@ -257,29 +259,40 @@ dat.2 <- melt(dat.2,
                        value.name = "Beta")
 
 dat.3 <- melt(dat.3, 
+                       id = c("user_id"),
+                       variable.name = "cond", 
+                       value.name = "Beta")
+
+dat.total <- melt(dat.total, 
                        id = c("user_id"),
                        variable.name = "cond", 
                        value.name = "Beta")
 
 p1 <- ggplot(dat.1, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
-      scale_y_continuous(limits=c(-.5, 2))+ggtitle("Batch 1") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+      scale_y_continuous(limits=c(-1, 3))+ggtitle("Batch 1") +theme(plot.title = element_text(lineheight=.8, face="bold"))
 
 p2 <- ggplot(dat.2, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
-      scale_y_continuous(limits=c(-.5, 2))+ggtitle("Batch 2") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+      scale_y_continuous(limits=c(-1, 3))+ggtitle("Batch 2") +theme(plot.title = element_text(lineheight=.8, face="bold"))
 
 p3 <- ggplot(dat.3, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
-      scale_y_continuous(limits=c(-.5, 2))+ggtitle("Batch 3") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+      scale_y_continuous(limits=c(-1, 3))+ggtitle("Batch 3") +theme(plot.title = element_text(lineheight=.8, face="bold"))
 
-grid.arrange(p1, p2, p3, ncol = 3)
+p4 <- ggplot(dat.total, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
+      scale_y_continuous(limits=c(-1, 3))+ggtitle("153 subjects") +theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+grid.arrange(p1, p2, p3, p4, ncol = 4)
 ```
 
 \newpage
 
 
-```{r pvalues, fig.height=5, fig.width=13, dpi=300, echo=FALSE}
+```{r pvalues, fig.height=5, fig.width=16, dpi=300, echo=FALSE}
 dat.1 = distinct(select(batch.1, user_id, Risk_sig, Gain_sig, Interaction_sig))
 dat.2 = distinct(select(batch.2, user_id, Risk_sig, Gain_sig, Interaction_sig))
 dat.3 = distinct(select(batch.3, user_id, Risk_sig, Gain_sig, Interaction_sig))
+
+
+dat.total = distinct(select(batch.total,user_id, Risk_sig, Gain_sig, Interaction_sig))
 
 dat.1 <- melt(dat.1, 
                        id = c("user_id"),
@@ -296,6 +309,11 @@ dat.3 <- melt(dat.3,
                        variable.name = "type", 
                        value.name = "sig")
 
+
+dat.total <- melt(dat.total, 
+                       id = c("user_id"),
+                       variable.name = "type", 
+                       value.name = "sig")
 #Significant plots
 p1 <- ggplot(dat.1, aes(x = type, fill = as.factor(sig))) +
          geom_bar(color = 'black', stat="count", position = "dodge")+
@@ -309,8 +327,11 @@ p3 <- ggplot(dat.3, aes(x = type, fill = as.factor(sig))) +
          geom_bar(color = 'black', stat="count", position = "dodge")+
          scale_y_continuous(limits=c(0, 110))+ggtitle("Batch 3") +theme(plot.title = element_text(lineheight=.8, face="bold"))
 
+p4 <- ggplot(dat.total, aes(x = type, fill = as.factor(sig))) +
+         geom_bar(color = 'black', stat="count", position = "dodge")+
+         scale_y_continuous(limits=c(0, 200))+ggtitle("Deployment") +theme(plot.title = element_text(lineheight=.8, face="bold"))
 
-grid.arrange(p1, p2, p3, ncol = 3)
+grid.arrange(p1, p2, p3, p4, ncol = 4)
 
 ```
 
