@@ -1,8 +1,7 @@
 # RiskBenefit_Neuroethics
+UPDATE the read me!
 
-Byron hath left his mark. Thy giveth. Thy taketh.
-
-Here you will find the preprocessing steps for preparing the behavioral task data and survey data for various modeling, statistical analysis, and visualizations.
+Here you will find the R project for preparing the behavioral task data and survey data for various modeling, statistical analysis, and visualizations.
 
 Included are:
 
