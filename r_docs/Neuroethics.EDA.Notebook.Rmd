@@ -20,7 +20,7 @@ Kiante Fernandez
 ##Set the stage
 ```{r load libraries }
 #this will load the libraries and WILL INSTALL IF YOU DO NOT HAVE THE PACKAGE (heads up)
-packages <- c('readr','dplyr','tidyselect','magrittr','ggplot2','ggpubr','reshape2', 'stringr')
+packages <- c('readr','dplyr','tidyselect','magrittr','ggplot2','ggpubr','reshape2', 'stringr', 'psych')
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
   install.packages(setdiff(packages, rownames(installed.packages())))
 }
@@ -31,7 +31,7 @@ rm(list=ls())
 
 ```{r Import and Transform task data, message=FALSE, warning=FALSE, include=FALSE}
 #note to pull data in terminal: aws s3 sync s3://neuroethics-task .
-files <- list.files(path = "../data/mturk_data/mturk_data_05162020", pattern = "*.csv", full.names = T)
+files <- list.files(path = "../data/mturk_data/mturk_data_05202020", pattern = "*.csv", full.names = T)
 
 #combine all the task csv into a list
 
@@ -55,7 +55,8 @@ cleanPilot = na.omit(cleanPilot)
 cleanPilot = filter(cleanPilot, total_trials >= N)
 cleanPilot = mutate(cleanPilot, ratio = gain / risk)#Gain over Risk
 
-cleanPilot$condition = factor(cleanPilot$condition)
+cleanPilot$condition = factor(cleanPilot$condition) 
+
 ```
 
 ```{r remove specific pilot users}
@@ -89,10 +90,10 @@ cleanPilot <- cleanPilot %>%
 ###Add Survey Data 
 
 ```{r survey data integration}
-#survey = read.csv("../data/Qualtrics Data/Final_Pilot_survey.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE)
+survey = read.csv("../data/Qualtrics Data/May_20_2020.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE)
 
-survey = read.csv("../data/Qualtrics Data/May_16_2020.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE)
-survey <- filter(survey, batch >= 3) #498
+survey <- filter(survey, batch >= 3)
+survey$batch <- as.factor(survey$batch) #616 raw pilot data
 ```
 
 ```{r careless/insufficient effort responce check}
@@ -111,7 +112,6 @@ survey = filter(survey, attention_check.3 == 1)
 survey = filter(survey, attention_check.4 == 1)
 
 #Time to complete survey
-library(psych)
 time2completion <- cbind(survey$Duration..in.seconds./60, survey[18])
 
 survey = survey[,-c(1:17)]
@@ -158,93 +158,75 @@ survey <- merge(survey, time2completion, "user_id")
 colnames(survey)[199] <- "time2completion"
 
 survey = filter(survey, time2completion >= 7)
-#303
+cleanPilot = merge(cleanPilot, cbind(survey[1], survey[198]), "user_id")
+
+#262
 ```
 
 ```{r Personlity Big 5}
-Big5 <- cbind(survey[,38:97], survey[1])
+Big5 <- c("BIG5_1", "BIG5_2", "BIG5_3", "BIG5_4", "BIG5_5", "BIG5_6", 
+           "BIG5_7", "BIG5_8", "BIG5_9", "BIG5_10", "BIG5_11", "BIG5_12", 
+           "BIG5_13", "BIG5_14", "BIG5_15", "BIG5_16", "BIG5_17", "BIG5_18", 
+           "BIG5_19", "BIG5_20", "BIG5_21", "BIG5_22", "BIG5_23", "BIG5_24", 
+           "BIG5_25", "BIG5_26", "BIG5_27", "BIG5_28", "BIG5_29", "BIG5_30", 
+           "BIG5_31", "BIG5_32", "BIG5_33", "BIG5_34", "BIG5_35", "BIG5_36", 
+           "BIG5_37", "BIG5_38", "BIG5_39", "BIG5_40", "BIG5_41", "BIG5_42", 
+           "BIG5_43", "BIG5_44", "BIG5_45", "BIG5_46", "BIG5_47", "BIG5_48", 
+           "BIG5_49", "BIG5_50", "BIG5_51", "BIG5_52", "BIG5_53", "BIG5_54", 
+           "BIG5_55", "BIG5_56", "BIG5_57", "BIG5_58", "BIG5_59", "BIG5_60")
+B5 <- survey[,Big5]
 
-for (i in 1:60) {
-  Big5[[i]] <- as.numeric(Big5[[i]])
-}
+Big5key <- list(   Extraversion      =c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16", 
+                                        "BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", 
+                                        "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56"),
+                   Agreeableness     =c("BIG5_2", "BIG5_7", "BIG5_12", "BIG5_17", 
+                                        "BIG5_22", "BIG5_27", "BIG5_32", "BIG5_37", 
+                                        "BIG5_42", "BIG5_47", "BIG5_52", "BIG5_57"),
+                   Conscientiousness =c("BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18",
+                                        "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", 
+                                        "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58"),
+                   Neuroticism       =c("BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", 
+                                        "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", 
+                                        "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59"),
+                   Openness          =c("BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", 
+                                        "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", 
+                                        "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"))
 
-Big5List = list(
-  Extraversion <-  
-    Big5[, c(1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56)],
-  Agreeableness <- 
-    Big5[, c(2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57)],
-  Conscientiousness <-  
-    Big5[, c(3, 8, 13, 18, 23, 28, 33, 38, 43, 48, 53, 58)],
-  Negative_Emotionality <- 
-    Big5[, c(4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 59)],
-  Open_Mindedness <- 
-    Big5[, c(5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)])
+#names(Big5key) <-  c("Extraversion","Agreeableness","Conscientiousness","Neuroticism","Openness")
+scores <- scoreItems(Big5key,B5)
 
-Results = list()
-for (i in 1:5){
-  totals <- apply(Big5List[[i]], 1, sum)
-  Results[[i]] = totals 
-}
-TEST = do.call(rbind, Results)
-colnames(TEST) = survey[,"user_id"]
-rownames(TEST) <- c('Extraversion','Agreeableness','Conscientiousness','Negative_Emotionality','Open_Mindedness')
-TEST = as.data.frame(t(TEST))
-XX <- cbind(user_id = Big5[,"user_id"], TEST)
-
-cleanPilot = merge(cleanPilot, XX, "user_id")
-rm(XX, TEST, Results,totals)
+cleanPilot <- merge(cleanPilot, cbind(scores$scores, survey[1]), "user_id")
 ```
 
 ```{r Moral Foundations Survey}
 MFQ <- cbind(survey[,4:36], survey[1])
 MFQ <- MFQ[,-17]#take out attention check
 
-MFQList <- list(
-  Harm <- MFQ[,c(1,7,12,17,23,28)],
-  Fairness <- MFQ[,c(2,8,13,18,24,29)],
-  Loyalty <- MFQ[,c(3,9,14,19,25,30)],
-  Athority <- MFQ[,c(4,10,15,20,26,31)],
-  Sancticy <- MFQ[,c(5,11,16,21,27,32)])
+MFQkey <- list(Harm     <- c("MFSQ1","MFSQ7","MFSQ12","MFSQ17","MFSQ23","MFSQ28"),
+                    Fairness <- c("MFSQ2","MFSQ8","MFSQ13","MFSQ18","MFSQ24","MFSQ29"),
+                    Loyalty  <- c("MFSQ3","MFSQ9","MFSQ14","MFSQ19","MFSQ25","MFSQ30"),
+                    Athority <- c("MFSQ4","MFSQ10","MFSQ15","MFSQ20","MFSQ26","MFSQ31"),
+                    Sancticy <- c("MFSQ5","MFSQ11","MFSQ16","MFSQ21","MFSQ27","MFSQ32"))
+names(MFQkey) <-  c("Harm","Fairness","Loyalty","Athority","Sancticy")
 
-Results = list()
-for (i in 1:5){
-  totals <- apply(MFQList[[i]], 1, sum)
-  Results[[i]] = totals 
-}
-
-TEST = do.call(rbind, Results)
-colnames(TEST) = survey[,"user_id"]
-rownames(TEST) <- c('Harm','Fairness','Loyalty','Athority','Sancticy')
-TEST <-  as.data.frame(t(TEST))
-XX <- cbind(user_id = MFQ[,"user_id"], TEST)
-
-cleanPilot <-  merge(cleanPilot, XX, "user_id")
+MFQsc <- scoreItems(MFQkey,MFQ)
+dat<- cbind(MFQsc$scores, survey[1])
+cleanPilot <- merge(cleanPilot, dat, "user_id")
 ```
 
 ```{r Empathy-IRI; Interpersonal Reactivity Index}
 IRI <- cbind(survey[,139:167], survey[1])
 IRI <- IRI[,-24]#take out attention check
 
-IRIList <- list(
-  PerspectiveTaking <- IRI[,c("PT1","PT2","PT3","PT4","PT5","PT6","PT7")],
-  Fantasy <- IRI[,c("FS1","FS2","FS3","FS4","FS5","FS6","FS7")],
-  EmpathicConcern <- IRI[,c("EC1","EC2","EC3","EC4","EC5","EC6","EC7")],
-  PersonalDistress <- IRI[,c("PD1","PD2","PD3","PD4","PD5","PD6","PD7")]
-)
+IRIkey <- list(PerspectiveTaking <- c("PT1","PT2","PT3","PT4","PT5","PT6","PT7"),
+               Fantasy           <- c("FS1","FS2","FS3","FS4","FS5","FS6","FS7"),
+               EmpathicConcern   <- c("EC1","EC2","EC3","EC4","EC5","EC6","EC7"),
+               PersonalDistress  <- c("PD1","PD2","PD3","PD4","PD5","PD6","PD7"))
+names(IRIkey) <- c("PerspectiveTaking","Fantasy","EmpathicConcern","PersonalDistress")
 
-Results = list()
-for (i in 1:4){
-  totals <- apply(IRIList[[i]], 1, sum)
-  Results[[i]] = totals 
-}
-
-TEST = do.call(rbind, Results)
-colnames(TEST) = survey[,"user_id"]
-rownames(TEST) <- c('PerspectiveTaking', 'Fantasy', 'EmpathicConcern','PersonalDistress')
-TEST <-  as.data.frame(t(TEST))
-XX <- cbind(user_id = IRI[,"user_id"], TEST)
-
-cleanPilot <-  merge(cleanPilot, XX, "user_id")
+IRIsc <- scoreItems(IRIkey,IRI)
+dat<- cbind(IRIsc$scores, survey[1])
+cleanPilot <- merge(cleanPilot, dat, "user_id")
 ```
 
 ```{r Short Schwartzs Value Survey}
@@ -289,6 +271,8 @@ rownames(TEST) <- c('Lying','Assasination','Torture','Murder','Stealing','Forced
 TEST <-  as.data.frame(t(TEST))
 XX <- cbind(user_id = MC[,"user_id"], TEST)
 
+XX$consequentialism.score <- apply(XX[,2:6], 1, mean)
+
 cleanPilot <-  merge(cleanPilot, XX, "user_id")
 ```
 
@@ -323,20 +307,13 @@ Berlin.Numeracy.Test<- cbind(survey[, 176:179], survey[1])
 ```{r GRiPs}
 GRiPs <- cbind(survey[,180:187], survey[1])
 
-GRiPsList <- list(
-  GRiPs.score <- GRiPs[,c(1,2,3,4,5,6,7,8)])
+GRiPs.key <- list(c("GRiPS_1", "GRiPS_2", "GRiPS_3", "GRiPS_4",
+                    "GRiPS_5", "GRiPS_6", "GRiPS_7", "GRiPS_8"))
+names(GRiPs.key) <- "GRiPs_Score"
 
-Results = list()
-totals <- apply(GRiPsList[[1]], 1, sum)
-Results[[1]] = totals 
-
-TEST = do.call(rbind, Results)
-colnames(TEST) = survey[,"user_id"]
-rownames(TEST) <- c('GRiPs.score')
-TEST <-  as.data.frame(t(TEST))
-XX <- cbind(user_id = GRiPs[,"user_id"], TEST)
-
-cleanPilot <-  merge(cleanPilot, XX, "user_id")
+GRiPsSc <- scoreItems(GRiPs.key,GRiPs)
+dat<- cbind(GRiPsSc$scores, survey[1])
+cleanPilot <- merge(cleanPilot, dat, "user_id")
 ```
 
 ```{r Political Orientation}
@@ -346,7 +323,6 @@ cleanPilot <-  merge(cleanPilot, Political.Orientation, "user_id")
 
 ```{r Demographics}
 Demographics <-  cbind(survey[, 98:116], survey[1])
-Demographics$sex <- as.factor(Demographics$sex) 
 cleanPilot <-  merge(cleanPilot, Demographics, "user_id")
 
 cleanPilot$education <- factor(cleanPilot$education,  
@@ -434,13 +410,13 @@ colnames(trial_index)= c("trial_index")
 cleanPilot = cbind(cleanPilot,trial_index)
 cleanPilot$trial_index = factor(cleanPilot$trial_index)
 
-cleanPilot = filter(cleanPilot, rt <= 60000 & rt >= 250)
+cleanPilot = filter(cleanPilot, rt <= 300000 & rt >= 250)
 
 cleanPilot =subset(cleanPilot, with(cleanPilot, user_id %in% names(which(table(user_id)>=N)))) #Remove Subjects who do not have 75 trials
-#258
+#344
 ```
 
-```{r plot RT}
+```{r plot RT, eval=FALSE}
 #table(cleanPilot$user_id) Sanity Check
 cleanPilot$user_id = factor(cleanPilot$user_id)
 RT = select_(cleanPilot,"user_id", "rt", "trial_index")
@@ -486,8 +462,7 @@ rm(data_long, x, datalist, trial_index)
 
 Neuroethics_Judgement = cleanPilot
 Neuroethics_Judgement$experimental_treatment_selected = factor(Neuroethics_Judgement$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))
-
-#write.csv(Neuroethics_Judgement,paste("../data/",'Cleaned_Pilot.07.csv',sep = ""))
+#write.csv(Neuroethics_Judgement,paste("../data/Cleaned_Pilot/",'Cleaned_Pilot.08.csv',sep = ""))
 ```
 
 ```{r observation count}
@@ -503,6 +478,11 @@ colnames(Observation_Counts) = c('No', 'Yes')
 summary(Observation_Counts)
 View(Observation_Counts)
 rm(i, x,datalist, dat)
+
+x <- distinct(Neuroethics_Judgement, user_id)
+
+Observation_Counts <- cbind(Observation_Counts, x)
+Neuroethics_Judgement <-  merge(Neuroethics_Judgement, Observation_Counts, "user_id")
 ```
 
 ```{r Individual subject visual data check, eval=FALSE, include=FALSE}
@@ -646,8 +626,13 @@ Neuroethics_Judgement <- group_by(Neuroethics_Judgement, user_id) %>%
    mutate(risk_c= scale(risk)) %>% 
    mutate(gain_c= scale(gain))
 
+#use data about how many people we have.. take a subset
 
-subjectModel.1 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk_c+ gain_c, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+#x <- group_by(Neuroethics_Judgement, user_id) %>% 
+#  filter(Yes >= 10) %>% 
+#  filter(No >= 10)
+
+subjectModel.1 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk_c + gain_c, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
 
 
 subjectModel.2 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk_c*gain_c, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
@@ -806,7 +791,7 @@ for (i in user_id){
 
 ```
 
-```{r beta check up}
+```{r beta check up again}
 
 coefficients = lapply(subjectModel.2, coef)
 coefficients = do.call(rbind, coefficients)
@@ -824,6 +809,8 @@ dat <- melt(coefficients,
                        value.name = "Beta")
 
 ggplot(dat, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", colour = "red") + 
+    stat_summary(fun = mean, geom = "point", colour = "red")+
       scale_y_continuous(limits=c(-10, 20))
 
 ```
@@ -832,6 +819,9 @@ ggplot(dat, aes(x=cond, y=Beta, fill=cond)) + geom_boxplot()+
 ```{r loss aversion}
 Neuroethics_Judgement = mutate(Neuroethics_Judgement, lambda = -Risk_Beta/Gain_Beta)
 
+#lambda (λ) was then calculated from the regression coefficients using the following formula: λ=−βloss/βgain.
+
+#Larger values of λ reflect greater sensitivity to losses relative to gains, and values of λ>1 reflect loss aversion. 
 
 loss_aversion <- mutate(coefficients, lambda = -Risk_Beta/Gain_Beta)
 
@@ -868,6 +858,8 @@ ggplot(data_long.2, aes(x = type, fill = as.factor(Stimulus))) +
 Participants risk aversion to harm will change as the cognitive domain being treated changes. Specifically, participants will be more risk averse to mood, and self-control because these are more central to self-identity.
 
 ```{r multilevel model at the level of the group, fig.height=7, fig.width=12, dpi=300}
+#LOAD THE DATA SET FROM THE CLEANED ONE
+
 dat.1 = distinct(select(Neuroethics_Judgement, user_id , condition ,  Risk_Beta , Gain_Beta , Interaction_Beta, sex, age, education, trial_index))
 
 
@@ -887,27 +879,27 @@ dat.1$trial_index <- as.numeric(dat.1$trial_index)
 dat.1$trial_index_c <- scale(dat.1$trial_index)
 
 
-m.base <- lmer(Stimulus_c ~ trial_index_c +
+m.base <- lmer(Stimulus ~ trial_index_c +
                       (1 | condition), 
                       data = dat.1,REML=F)
 
-m.0 <- lmer(Stimulus_c ~ trial_index_c + condition +
+m.0 <- lmer(Stimulus ~ trial_index_c + condition +
                       (1 | condition), 
                       data = dat.1,REML=F)
 
-m.1 <- lmer(Stimulus_c ~ trial_index_c + condition + age_c +
+m.1 <- lmer(Stimulus ~ trial_index_c + condition + age_c +
                       (1 | condition), 
                       data = dat.1,REML=F)
 
-m.2 <- lmer(Stimulus_c ~ trial_index_c + condition + age_c + sex +
+m.2 <- lmer(Stimulus ~ trial_index_c + condition + age_c + sex +
                       (1 | condition), 
                       data = dat.1,REML=F)
 
-m.3 <- lmer(Stimulus_c ~ trial_index_c + condition + age_c + sex + education +
+m.3 <- lmer(Stimulus ~ trial_index_c + condition + age_c + sex + education +
                       (1 | condition), 
                       data = dat.1,REML=F)
 
-m.4 <- lmer(Stimulus_c ~ trial_index_c*condition + age_c + sex + education +
+m.4 <- lmer(Stimulus ~ trial_index_c*condition + age_c + sex + education +
                       (1 | condition), 
                       data = dat.1,REML=F)
 
@@ -915,22 +907,25 @@ m.4 <- lmer(Stimulus_c ~ trial_index_c*condition + age_c + sex + education +
 anova(m.base, m.0, m.1, m.2, m.3, m.4)
 
 
-plot(m.0, condition ~ resid(.), abline = 0 ) # generate diagnostic plots
+plot(m.3, condition ~ resid(.), abline = 0 ) # generate diagnostic plots
 
-plot(m.0, resid(., type = "pearson") ~ fitted(.) | condition, id = 0.05, 
+plot(m.3, resid(., type = "pearson") ~ fitted(.) | condition, id = 0.05, 
      adj = -0.3, pch = 20, col = "gray40")
 
 library(car)
 # check homogeneity
+#Computes Levene's test for homogeneity of variance across groups.
+
+
 leveneTest(dat.1$Stimulus, dat.1$condition, center = mean)
 
-plot(m.0, pch = 20, col = "black", lty = "dotted")
+plot(m.3, pch = 20, col = "black", lty = "dotted")
 
-plot(m.0, form = resid(., type = "pearson") ~ fitted(.) | condition, abline = 0, 
+plot(m.3, form = resid(., type = "pearson") ~ fitted(.) | condition, abline = 0, 
      cex = .5, pch = 20, col = "black")
 
 # observed responses versus the within-group fitted values
-plot(m.0, Stimulus ~ fitted(.), id = 0.05, adj = -0.3, cex = .8, pch = 20, col = "blue")
+plot(m.3, Stimulus ~ fitted(.), id = 0.05, adj = -0.3, cex = .8, pch = 20, col = "blue")
 ``` 
 
 
@@ -1051,36 +1046,6 @@ summary(subjectTest.1)
 # None of the Interaction variables show significance, so linearity test passes
 ```
 
-```{r users to remove}
-REMOVE = c(
-  "wpchz8fz",
-  "tdDTyNLl",
-  "CUyB01Th",
-  "d9UbV0sj",
-  "PiGCo5DO",
-  "yCZDIVJF",
-  "WUTFOue2",
-  "Rp8H93tM",
-  "9Z5vJ7oT",
-  "esSkjqdS",
-  "XNHqndg3",
-  "spGR9XvT",
-  "qf27dbHj",
-  "y6m1AOsD",
-  "hgbHHiLn",
-  "Ly8mJkxP"
-)
-
-Neuroethics_Judgement %>%
-      group_by(user_id)  %>%
-      mutate(Neuroethics_Judgement, risk_c= risk-mean(risk)) %>%
-      mutate(Neuroethics_Judgement, gain_c= gain-mean(gain))
-
-Neuroethics_Judgement %>%
-      group_by(user_id)  %>%
-      mutate(risk_c= risk-mean(risk)) %>%
-      mutate(gain_c= gain-mean(gain))
-```
 
 ```{r odds ratio confidence intervals, eval=FALSE, include=FALSE}
 #Compute odds ratio confidence interval
